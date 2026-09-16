@@ -13,13 +13,13 @@
     {
       "name": "Recipe detail scales a brew",
       "path": "/?recipe=v60",
-      "expectSelector": "#recipe-screen[data-active=\"true\"]"
+      "expectText": "Scale the recipe"
     },
     {
       "id": "brew.guided-timer",
       "name": "Guided timer renders an active brew",
       "path": "/?brew=v60&shot=active",
-      "expectSelector": "#brew-screen[data-active=\"true\"] #timer-panel",
+      "expectText": "First pour",
       "visual": true,
       "impact": [
         "public/**",

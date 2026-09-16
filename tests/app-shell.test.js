@@ -29,6 +29,8 @@ test('the manifest declares navigable checks for each product screen', () => {
   ]);
   assert.equal(manifest.tests[2].visual, true);
   assert.equal(manifest.tests[2].id, 'brew.guided-timer');
+  assert.equal(manifest.tests[1].expectText, 'Scale the recipe');
+  assert.equal(manifest.tests[2].expectText, 'First pour');
 });
 
 test('user-facing product files contain no em dash encoding', () => {
