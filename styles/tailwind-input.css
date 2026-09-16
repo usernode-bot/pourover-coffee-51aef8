@@ -1,0 +1,13 @@
+/* Input stylesheet for this app's Tailwind build.
+ *
+ * Deliberately OUTSIDE public/ so it is never served — the @tailwind lines
+ * are build-time directives and mean nothing to a browser. npm run build
+ * compiles this to public/tailwind.css with Docker or Paketo.
+ *
+ * "base" is the preflight layer (the cross-browser reset). Keep all three
+ * layers, in this order; dropping base changes every heading, list and form
+ * control.
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

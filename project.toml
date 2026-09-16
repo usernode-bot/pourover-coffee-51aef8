@@ -1,0 +1,12 @@
+[_]
+schema-version = "0.2"
+
+[io.buildpacks]
+exclude = [
+  "node_modules",
+  "public/tailwind.css",
+]
+
+[[io.buildpacks.build.env]]
+name = "BP_NODE_RUN_SCRIPTS"
+value = "build"

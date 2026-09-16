@@ -1,0 +1,20 @@
+{
+  "name": "pourover-coffee-51aef8",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pourover Coffee",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "npm run build:css",
+    "build:css": "tailwindcss -c tailwind.config.js -i styles/tailwind-input.css -o public/tailwind.css --minify"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "pg": "^8.13.0",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}
