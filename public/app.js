@@ -7,7 +7,9 @@
     RECIPES,
     clampCoffee,
     formatDuration,
+    getBrewTiming,
     getRecipe,
+    getStepStart,
     scaleRecipe,
   } = window.PouroverRecipes;
 
@@ -51,6 +53,14 @@
     activeStepLabel: document.getElementById('active-step-label'),
     activeWaterTarget: document.getElementById('active-water-target'),
     activeStepInstruction: document.getElementById('active-step-instruction'),
+    nextStepPreview: document.getElementById('next-step-preview'),
+    nextStepKicker: document.getElementById('next-step-kicker'),
+    nextStepTiming: document.getElementById('next-step-timing'),
+    nextStepLabel: document.getElementById('next-step-label'),
+    nextStepPreparation: document.getElementById('next-step-preparation'),
+    nextStepTargetWrap: document.getElementById('next-step-target-wrap'),
+    nextStepTarget: document.getElementById('next-step-target'),
+    timerAnnouncement: document.getElementById('timer-announcement'),
     stepProgress: document.getElementById('step-progress'),
     previousStep: document.getElementById('previous-step'),
     nextStep: document.getElementById('next-step'),
@@ -72,6 +82,8 @@
     timer: freshTimer(),
     timerHandle: null,
     lastAnnouncedStep: -1,
+    lastPreparationAnnouncementStep: -1,
+    lastPreparationHapticStep: -1,
   };
 
   function loadDoses() {
@@ -245,7 +257,7 @@
       if (shot === 'active') {
         // Reviewer captures must not vary with this browser's saved dose.
         state.scaled = scaleRecipe(state.recipe, state.recipe.defaultCoffee);
-        state.timer.elapsed = Math.min(state.scaled.totalDuration - 1, state.scaled.steps[0].duration + 20);
+        state.timer.elapsed = Math.min(state.scaled.totalDuration - 1, state.scaled.steps[0].duration + 25);
         state.timer.anchorElapsed = state.timer.elapsed;
         state.timer.started = true;
       }
@@ -266,21 +278,11 @@
     return state.timer.anchorElapsed + (Date.now() - state.timer.anchorTime) / 1000;
   }
 
-  function stepStart(index) {
-    return state.scaled.steps.slice(0, index).reduce((sum, step) => sum + step.duration, 0);
-  }
-
-  function stepIndexForElapsed(elapsed) {
-    let boundary = 0;
-    for (let index = 0; index < state.scaled.steps.length; index += 1) {
-      boundary += state.scaled.steps[index].duration;
-      if (elapsed < boundary) return index;
-    }
-    return state.scaled.steps.length - 1;
-  }
-
   function renderBrewShell() {
     state.lastAnnouncedStep = -1;
+    state.lastPreparationAnnouncementStep = -1;
+    state.lastPreparationHapticStep = -1;
+    elements.timerAnnouncement.textContent = '';
     elements.brewMethod.textContent = state.scaled.name;
     elements.brewDose.textContent = `${state.scaled.coffee}g coffee · ${state.scaled.water}g water`;
     elements.brewRatio.textContent = `1:${formatRatio(state.scaled.ratio)} · ${state.scaled.temperature}`;
@@ -289,6 +291,46 @@
       `<span class="progress-dot" data-step-dot="${index}" data-state="upcoming" title="${step.label}"></span>`
     )).join('');
     renderTimer();
+  }
+
+  function renderNextStep(timing) {
+    if (timing.isFinalStep) {
+      elements.nextStepPreview.dataset.state = 'final';
+      elements.nextStepKicker.textContent = 'Final step';
+      elements.nextStepTiming.textContent = 'Nothing else to prepare';
+      elements.nextStepLabel.textContent = 'Brew complete is next';
+      elements.nextStepPreparation.textContent = 'Finish this step and let the timer carry you to completion.';
+      elements.nextStepTargetWrap.hidden = true;
+      return;
+    }
+
+    const nextStep = state.scaled.steps[timing.nextStepIndex];
+    const cueState = timing.isImminent
+      ? 'imminent'
+      : timing.isPreparing ? 'preparing' : 'upcoming';
+    elements.nextStepPreview.dataset.state = cueState;
+    elements.nextStepKicker.textContent = timing.isImminent
+      ? 'Get ready'
+      : timing.isPreparing ? 'Prepare' : 'Up next';
+    elements.nextStepTiming.textContent = `in ${formatDuration(Math.ceil(timing.secondsUntilNext))} · starts at ${formatDuration(timing.nextStartsAt)}`;
+    elements.nextStepLabel.textContent = nextStep.label;
+    elements.nextStepPreparation.textContent = nextStep.preparation;
+    elements.nextStepTargetWrap.hidden = false;
+    elements.nextStepTarget.textContent = `${nextStep.target}g`;
+
+    if (state.timer.running
+        && timing.isPreparing
+        && state.lastPreparationAnnouncementStep !== timing.nextStepIndex) {
+      elements.timerAnnouncement.textContent = `Prepare for ${nextStep.label} in ${Math.ceil(timing.secondsUntilNext)} seconds. Water target ${nextStep.target} grams.`;
+      state.lastPreparationAnnouncementStep = timing.nextStepIndex;
+    }
+
+    if (state.timer.running
+        && timing.isImminent
+        && state.lastPreparationHapticStep !== timing.nextStepIndex) {
+      navigator.vibrate?.([12, 36, 12]);
+      state.lastPreparationHapticStep = timing.nextStepIndex;
+    }
   }
 
   function renderTimer() {
@@ -304,7 +346,8 @@
     elements.brewComplete.hidden = !state.timer.completed;
     if (state.timer.completed) return;
 
-    const stepIndex = stepIndexForElapsed(elapsed);
+    const timing = getBrewTiming(state.scaled, elapsed);
+    const { stepIndex } = timing;
     const step = state.scaled.steps[stepIndex];
     const progress = Math.min(1, elapsed / state.scaled.totalDuration);
     elements.timerRing.style.setProperty('--progress', `${progress * 360}deg`);
@@ -315,6 +358,7 @@
     elements.activeWaterTarget.textContent = step.target ? `${step.target}g` : 'Prep';
     elements.activeStepInstruction.textContent = step.instruction;
     elements.previousStep.disabled = stepIndex === 0 && elapsed <= 0;
+    renderNextStep(timing);
 
     elements.stepProgress.querySelectorAll('[data-step-dot]').forEach((dot, index) => {
       dot.dataset.state = index < stepIndex ? 'done' : index === stepIndex ? 'active' : 'upcoming';
@@ -368,12 +412,15 @@
       return;
     }
     const safeIndex = Math.max(0, index);
-    state.timer.elapsed = stepStart(safeIndex);
+    state.timer.elapsed = getStepStart(state.scaled, safeIndex);
     state.timer.anchorElapsed = state.timer.elapsed;
     state.timer.anchorTime = Date.now();
     state.timer.started = true;
     state.timer.completed = false;
     state.lastAnnouncedStep = safeIndex;
+    state.lastPreparationAnnouncementStep = -1;
+    state.lastPreparationHapticStep = -1;
+    elements.timerAnnouncement.textContent = '';
     renderTimer();
   }
 
@@ -424,11 +471,11 @@
   });
   elements.timerToggle.addEventListener('click', toggleTimer);
   elements.previousStep.addEventListener('click', () => {
-    const current = stepIndexForElapsed(elapsedNow());
+    const current = getBrewTiming(state.scaled, elapsedNow()).stepIndex;
     seekToStep(current - 1);
   });
   elements.nextStep.addEventListener('click', () => {
-    const current = stepIndexForElapsed(elapsedNow());
+    const current = getBrewTiming(state.scaled, elapsedNow()).stepIndex;
     seekToStep(current + 1);
   });
   elements.resetTimer.addEventListener('click', resetTimer);

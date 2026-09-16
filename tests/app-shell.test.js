@@ -30,7 +30,20 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[2].visual, true);
   assert.equal(manifest.tests[2].id, 'brew.guided-timer');
   assert.equal(manifest.tests[1].expectText, 'Scale the recipe');
-  assert.equal(manifest.tests[2].expectText, 'First pour');
+  assert.equal(manifest.tests[2].expectText, 'Get ready');
+});
+
+test('the guided timer includes an accessible non-ticking upcoming-step preview', () => {
+  const html = read('public/index.html');
+  const source = read('public/app.js');
+
+  assert.match(html, /id="next-step-preview"[^>]+data-state="upcoming"/);
+  assert.match(html, /id="next-step-timing"/);
+  assert.match(html, /id="next-step-target"/);
+  assert.match(html, /id="next-step-preparation"/);
+  assert.match(html, /id="timer-announcement"[^>]+aria-live="polite"/);
+  assert.doesNotMatch(html, /id="next-step-preview"[^>]+aria-live=/);
+  assert.match(source, /navigator\.vibrate\?\.\(\[12, 36, 12\]\)/);
 });
 
 test('user-facing product files contain no em dash encoding', () => {
