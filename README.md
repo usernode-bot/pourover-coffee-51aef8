@@ -1,27 +1,41 @@
 # Pourover Coffee
 
-> **Starter template** — this repo was scaffolded by Homeroom Social
-> Vibecoding. Everything in it is placeholder example code until the
-> app's first real feature is built.
+A calm, mobile-first companion for scaling pour-over recipes and following
+a brew one timed step at a time. It includes starting recipes for V60,
+Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
 
-The scaffold is a small working demo that proves the plumbing works:
+## What it does
 
-- **Sign-in** — the server verifies the platform-issued user token
-  (an RS256 JWT) on every request, so the app already knows who is
-  using it. No accounts to build.
-- **Database** — the app has its own private Postgres database; the
-  demo stores button presses in a `presses` table.
-- **Live API** — two example routes (`/api/press`,
-  `/api/leaderboard`) read and write through a real Express server.
-- **Styling** — Tailwind CSS, precompiled by `npm run build` during
-  image creation with either Kubernetes/Paketo or standalone Docker.
+- Scales coffee from 5g to 60g and calculates total water from each recipe's
+  ratio.
+- Scales every cumulative pour target with the chosen dose.
+- Guides a brew with a timestamp-based timer that stays accurate after the
+  page has been in the background.
+- Provides pause, resume, previous, next, reset, and brew-again controls.
+- Remembers a preferred dose for each method in local storage.
+- Exposes deterministic recipe and timer URLs for Homeroom proposal checks.
 
-## Replacing the template
+Recipes are starting points. Taste the cup and adjust one variable at a time.
 
-Open the app on Homeroom, tap **Improve** in the header, and describe
-the app you want in plain English — the template will be replaced with
-your real app. You can also run Claude Code against this repo directly;
-start with `CLAUDE.md`, which carries the app-specific notes and
-points at the platform rules.
+## Local development
 
-Once the real app exists, rewrite this README to describe it.
+```sh
+npm ci
+npm test
+npm run build
+npm start
+```
+
+Homeroom supplies authentication and runtime environment variables in hosted
+deployments. The app keeps the scaffold's deny-by-default JWT verification and
+uses no database for its current feature set.
+
+## Structure
+
+- `public/index.html`: the three-screen application shell.
+- `public/app.css`: the coffee-and-paper visual system.
+- `public/recipes.js`: recipe definitions and dose-scaling logic.
+- `public/app.js`: navigation, rendering, local preferences, and the timer.
+- `server.js`: Homeroom authentication, static serving, deep links, and
+  graceful shutdown.
+- `dapp.json`: the app icon and proposal checks.

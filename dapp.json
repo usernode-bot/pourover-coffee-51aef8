@@ -1,3 +1,31 @@
 {
-  "secrets": []
+  "name": "Pourover Coffee",
+  "icon": {
+    "emoji": "☕"
+  },
+  "secrets": [],
+  "tests": [
+    {
+      "name": "Recipe library renders",
+      "path": "/",
+      "expectSelector": "#recipe-list [data-recipe-id]"
+    },
+    {
+      "name": "Recipe detail scales a brew",
+      "path": "/?recipe=v60",
+      "expectText": "Scale the recipe"
+    },
+    {
+      "id": "brew.guided-timer",
+      "name": "Guided timer renders an active brew",
+      "path": "/?brew=v60&shot=active",
+      "expectText": "First pour",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    }
+  ]
 }
