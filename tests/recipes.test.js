@@ -2,10 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_PREPARATION_LEAD_SECONDS,
+  IMMINENT_PREPARATION_SECONDS,
   MAX_COFFEE_GRAMS,
   MIN_COFFEE_GRAMS,
   RECIPES,
   clampCoffee,
+  getBrewTiming,
+  getPreparationLead,
   getRecipe,
   scaleRecipe,
 } = require('../public/recipes');
@@ -49,4 +53,69 @@ test('scaled step targets keep the recipe proportions', () => {
   const scaled = scaleRecipe(original, 30);
   assert.equal(scaled.water, 500);
   assert.deepEqual(scaled.steps.map((step) => step.target), [90, 300, 500, 500]);
+});
+
+test('every recipe step has preparation guidance for upcoming-step previews', () => {
+  for (const recipe of RECIPES) {
+    for (const step of recipe.steps) {
+      assert.ok(step.preparation?.trim(), `${recipe.id}:${step.label}`);
+      if (step.prepareLeadSeconds !== undefined) {
+        assert.ok(step.prepareLeadSeconds >= IMMINENT_PREPARATION_SECONDS);
+      }
+    }
+  }
+});
+
+test('brew timing exposes the next boundary, countdown, and scaled target', () => {
+  const scaled = scaleRecipe('v60', 30);
+  const timing = getBrewTiming(scaled, 34);
+
+  assert.equal(timing.stepIndex, 0);
+  assert.equal(timing.nextStepIndex, 1);
+  assert.equal(timing.nextStartsAt, 45);
+  assert.equal(timing.secondsUntilNext, 11);
+  assert.equal(timing.preparationLeadSeconds, DEFAULT_PREPARATION_LEAD_SECONDS);
+  assert.equal(timing.isPreparing, true);
+  assert.equal(timing.isImminent, false);
+  assert.equal(scaled.steps[timing.nextStepIndex].target, 300);
+});
+
+test('the final ten seconds and exact step boundary are deterministic', () => {
+  const scaled = scaleRecipe('v60', 15);
+  const imminent = getBrewTiming(scaled, 35);
+  const transitioned = getBrewTiming(scaled, 45);
+
+  assert.equal(imminent.secondsUntilNext, IMMINENT_PREPARATION_SECONDS);
+  assert.equal(imminent.isImminent, true);
+  assert.equal(transitioned.stepIndex, 1);
+  assert.equal(transitioned.nextStepIndex, 2);
+  assert.equal(transitioned.nextStartsAt, 80);
+  assert.equal(transitioned.secondsUntilNext, 35);
+  assert.equal(transitioned.isPreparing, false);
+});
+
+test('recipe steps can extend the default preparation lead time', () => {
+  const switchRecipe = scaleRecipe('switch', 20);
+  const beforeWindow = getBrewTiming(switchRecipe, 54);
+  const inWindow = getBrewTiming(switchRecipe, 55);
+
+  assert.equal(getPreparationLead(switchRecipe.steps[2]), 20);
+  assert.equal(beforeWindow.nextStepIndex, 2);
+  assert.equal(beforeWindow.secondsUntilNext, 21);
+  assert.equal(beforeWindow.isPreparing, false);
+  assert.equal(inWindow.secondsUntilNext, 20);
+  assert.equal(inWindow.isPreparing, true);
+});
+
+test('the last brew step has no stale upcoming action', () => {
+  const scaled = scaleRecipe('v60', 15);
+  const timing = getBrewTiming(scaled, 115);
+
+  assert.equal(timing.stepIndex, 3);
+  assert.equal(timing.nextStepIndex, null);
+  assert.equal(timing.nextStartsAt, null);
+  assert.equal(timing.secondsUntilNext, null);
+  assert.equal(timing.isPreparing, false);
+  assert.equal(timing.isImminent, false);
+  assert.equal(timing.isFinalStep, true);
 });

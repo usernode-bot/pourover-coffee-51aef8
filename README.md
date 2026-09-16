@@ -11,11 +11,17 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
 - Scales every cumulative pour target with the chosen dose.
 - Guides a brew with a timestamp-based timer that stays accurate after the
   page has been in the background.
+- Keeps the next action visible with its scheduled time, countdown, scaled
+  water target, and a preparation cue.
 - Provides pause, resume, previous, next, reset, and brew-again controls.
 - Remembers a preferred dose for each method in local storage.
 - Exposes deterministic recipe and timer URLs for Homeroom proposal checks.
 
 Recipes are starting points. Taste the cup and adjust one variable at a time.
+
+Upcoming steps enter their preparation state 15 seconds before the boundary
+by default. A recipe step can set `prepareLeadSeconds` when its setup needs
+more time. The final 10 seconds always use the stronger get-ready treatment.
 
 ## Local development
 

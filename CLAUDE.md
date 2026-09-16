@@ -59,6 +59,10 @@ for V60, Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
   same proportion, and the final target must equal total water.
 - Recipe definitions and scaling logic live in `public/recipes.js` so the
   browser and Node unit tests exercise the same source.
+- Each recipe step includes short `preparation` copy for the timer's upcoming
+  action card. Preparation begins 15 seconds before the step unless that step
+  sets a longer `prepareLeadSeconds` value; the final 10 seconds use the
+  strongest visible cue.
 - Preferred doses are non-sensitive device preferences and stay in
   `localStorage`. The MVP has no server-side user data and needs no database.
 - Keep the experience calm and practical. Add one brewing variable at a

@@ -19,7 +19,7 @@
       "id": "brew.guided-timer",
       "name": "Guided timer renders an active brew",
       "path": "/?brew=v60&shot=active",
-      "expectText": "First pour",
+      "expectText": "Get ready",
       "visual": true,
       "impact": [
         "public/**",
