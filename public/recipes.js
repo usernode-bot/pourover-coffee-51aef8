@@ -7,6 +7,7 @@
   const MAX_COFFEE_GRAMS = 60;
   const DEFAULT_PREPARATION_LEAD_SECONDS = 15;
   const IMMINENT_PREPARATION_SECONDS = 10;
+  const INITIAL_RECIPE_PUBLISHED_AT = '2026-09-16';
   const TAG_KEYS = Object.freeze(['roast', 'profile', 'technique', 'experience', 'serving']);
   const FILTER_KEYS = Object.freeze(['method', ...TAG_KEYS]);
 
@@ -135,10 +136,20 @@
   }
 
   function originalRecipe(config) {
-    return { ...config, attribution: ORIGINAL_ATTRIBUTION };
+    const version = Number.isInteger(config.version) && config.version > 0 ? config.version : 1;
+    return {
+      ...config,
+      version,
+      revisionId: `${config.id}@${version}`,
+      publishedAt: config.publishedAt || INITIAL_RECIPE_PUBLISHED_AT,
+      attribution: ORIGINAL_ATTRIBUTION,
+    };
   }
 
-  const RECIPES = Object.freeze([
+  // Keep every historical revision in this append-only collection. To change
+  // a recipe, add a higher version with the same id instead of editing the
+  // earlier record. RECIPES below exposes only the latest revision per id.
+  const RECIPE_REVISIONS = Object.freeze([
     originalRecipe({
       id: 'v60-bright', methodId: 'v60', title: 'Bright two-pour',
       summary: 'A crisp, transparent cup with a gentle bloom and two controlled pours.',
@@ -341,6 +352,12 @@
     }),
   ]);
 
+  const RECIPES = Object.freeze(Array.from(RECIPE_REVISIONS.reduce((latest, recipe) => {
+    const current = latest.get(recipe.id);
+    if (!current || recipe.version > current.version) latest.set(recipe.id, recipe);
+    return latest;
+  }, new Map()).values()));
+
   function getMethod(id) {
     return METHODS.find((method) => method.id === id) || METHODS[0];
   }
@@ -359,6 +376,23 @@
   function getRecipe(id) {
     const resolvedId = resolveRecipeId(id);
     return RECIPES.find((recipe) => recipe.id === resolvedId) || RECIPES[0];
+  }
+
+  function getRecipeRevision(idOrRevisionId, versionValue) {
+    const raw = String(idOrRevisionId || '');
+    const match = raw.match(/^(.+)@(\d+)$/);
+    const requestedVersion = match ? Number(match[2]) : Number(versionValue);
+    if (!Number.isInteger(requestedVersion) || requestedVersion <= 0) return getRecipe(raw);
+    const requestedId = match ? match[1] : raw;
+    return RECIPE_REVISIONS.find((recipe) => (
+      recipe.id === requestedId && recipe.version === requestedVersion
+    )) || null;
+  }
+
+  function isCurrentRecipeRevision(recipeOrSnapshot) {
+    if (!recipeOrSnapshot) return false;
+    const current = RECIPES.find((recipe) => recipe.id === recipeOrSnapshot.id);
+    return !!current && current.version === recipeOrSnapshot.version;
   }
 
   function getTagLabel(facet, value) {
@@ -391,7 +425,9 @@
   }
 
   function scaleRecipe(recipeOrId, coffeeValue) {
-    const recipe = typeof recipeOrId === 'string' ? getRecipe(recipeOrId) : recipeOrId;
+    const recipe = typeof recipeOrId === 'string'
+      ? (getRecipeRevision(recipeOrId) || getRecipe(recipeOrId))
+      : recipeOrId;
     const coffee = clampCoffee(coffeeValue);
     const water = Math.round(coffee * recipe.ratio);
     let previousTarget = 0;
@@ -404,6 +440,45 @@
       return { ...recipeStep, target };
     });
     return { ...recipe, coffee, water, steps, totalDuration: steps.reduce((sum, recipeStep) => sum + recipeStep.duration, 0) };
+  }
+
+  function deepFreeze(value) {
+    if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+    Object.values(value).forEach(deepFreeze);
+    return Object.freeze(value);
+  }
+
+  RECIPE_REVISIONS.forEach(deepFreeze);
+
+  function createRecipeSnapshot(recipeOrId, coffeeValue) {
+    const recipe = typeof recipeOrId === 'string'
+      ? (getRecipeRevision(recipeOrId) || getRecipe(recipeOrId))
+      : recipeOrId;
+    const scaled = scaleRecipe(recipe, coffeeValue);
+    const method = getMethod(recipe.methodId);
+    return deepFreeze({
+      schemaVersion: 1,
+      id: recipe.id,
+      version: recipe.version,
+      revisionId: recipe.revisionId,
+      publishedAt: recipe.publishedAt,
+      methodId: method.id,
+      methodName: method.name,
+      title: recipe.title,
+      summary: recipe.summary,
+      result: recipe.result,
+      attribution: { ...recipe.attribution },
+      coffee: scaled.coffee,
+      water: scaled.water,
+      ratio: recipe.ratio,
+      temperature: recipe.temperature,
+      grind: recipe.grind,
+      difficulty: recipe.difficulty,
+      equipment: method.equipment,
+      tags: Object.fromEntries(TAG_KEYS.map((facet) => [facet, [...recipe.tags[facet]]])),
+      totalDuration: scaled.totalDuration,
+      steps: scaled.steps.map((recipeStep) => ({ ...recipeStep })),
+    });
   }
 
   function getPreparationLead(recipeStep) {
@@ -455,9 +530,11 @@
 
   return {
     DEFAULT_PREPARATION_LEAD_SECONDS, FILTER_KEYS, IMMINENT_PREPARATION_SECONDS,
-    MAX_COFFEE_GRAMS, METHODS, MIN_COFFEE_GRAMS, RECIPES, TAG_KEYS, TAG_TAXONOMY,
-    clampCoffee, filterRecipes, formatDuration, getBrewTiming, getMethod, getPreparationLead,
-    getRecipe, getRecipesForMethod, getStepStart, getTagLabel, normalizeFilters,
+    MAX_COFFEE_GRAMS, METHODS, MIN_COFFEE_GRAMS, RECIPES, RECIPE_REVISIONS,
+    TAG_KEYS, TAG_TAXONOMY,
+    clampCoffee, createRecipeSnapshot, filterRecipes, formatDuration, getBrewTiming,
+    getMethod, getPreparationLead, getRecipe, getRecipeRevision, getRecipesForMethod,
+    getStepStart, getTagLabel, isCurrentRecipeRevision, normalizeFilters,
     resolveRecipeId, scaleRecipe,
   };
 });

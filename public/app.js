@@ -7,6 +7,7 @@
     METHODS,
     MIN_COFFEE_GRAMS,
     RECIPES,
+    RECIPE_REVISIONS,
     TAG_KEYS,
     TAG_TAXONOMY,
     clampCoffee,
@@ -15,9 +16,11 @@
     getBrewTiming,
     getMethod,
     getRecipe,
+    getRecipeRevision,
     getRecipesForMethod,
     getStepStart,
     getTagLabel,
+    isCurrentRecipeRevision,
     normalizeFilters,
     scaleRecipe,
   } = window.PouroverRecipes;
@@ -27,11 +30,15 @@
     method: document.getElementById('method-screen'),
     recipe: document.getElementById('recipe-screen'),
     brew: document.getElementById('brew-screen'),
+    journal: document.getElementById('journal-screen'),
+    journalDetail: document.getElementById('journal-detail-screen'),
+    journalForm: document.getElementById('journal-form-screen'),
   };
 
   const elements = {
     back: document.getElementById('back-button'),
     home: document.getElementById('home-button'),
+    journalButton: document.getElementById('journal-button'),
     about: document.getElementById('about-button'),
     methodList: document.getElementById('method-list'),
     recipeList: document.getElementById('recipe-list'),
@@ -99,12 +106,57 @@
     timerToggleLabel: document.getElementById('timer-toggle-label'),
     resetTimer: document.getElementById('reset-timer'),
     brewComplete: document.getElementById('brew-complete'),
+    saveBrewNotes: document.getElementById('save-brew-notes'),
     brewAgain: document.getElementById('brew-again'),
     returnToRecipe: document.getElementById('return-to-recipe'),
+    journalCount: document.getElementById('journal-count'),
+    journalNew: document.getElementById('journal-new'),
+    journalFilters: document.getElementById('journal-filters'),
+    journalClearFilters: document.getElementById('journal-clear-filters'),
+    journalStatus: document.getElementById('journal-status'),
+    journalList: document.getElementById('journal-list'),
+    journalEmpty: document.getElementById('journal-empty'),
+    journalEmptyCopy: document.getElementById('journal-empty-copy'),
+    journalEmptyAction: document.getElementById('journal-empty-action'),
+    journalError: document.getElementById('journal-error'),
+    journalErrorCopy: document.getElementById('journal-error-copy'),
+    journalRetry: document.getElementById('journal-retry'),
+    journalDetailMethod: document.getElementById('journal-detail-method'),
+    journalDetailTitle: document.getElementById('journal-detail-title'),
+    journalDetailDate: document.getElementById('journal-detail-date'),
+    journalDetailVersion: document.getElementById('journal-detail-version'),
+    journalDemoBadge: document.getElementById('journal-demo-badge'),
+    journalVersionStatus: document.getElementById('journal-version-status'),
+    journalSnapshotDetails: document.getElementById('journal-snapshot-details'),
+    journalTasteScores: document.getElementById('journal-taste-scores'),
+    journalSetupDetails: document.getElementById('journal-setup-details'),
+    journalDetailNotes: document.getElementById('journal-detail-notes'),
+    journalDetailChange: document.getElementById('journal-detail-change'),
+    journalDetailActions: document.getElementById('journal-detail-actions'),
+    journalRepeat: document.getElementById('journal-repeat'),
+    journalEdit: document.getElementById('journal-edit'),
+    journalDelete: document.getElementById('journal-delete'),
+    journalDeleteConfirmation: document.getElementById('journal-delete-confirmation'),
+    journalDeleteCancel: document.getElementById('journal-delete-cancel'),
+    journalDeleteConfirm: document.getElementById('journal-delete-confirm'),
+    journalDetailError: document.getElementById('journal-detail-error'),
+    journalFormKicker: document.getElementById('journal-form-kicker'),
+    journalFormTitle: document.getElementById('journal-form-title'),
+    journalFormIntro: document.getElementById('journal-form-intro'),
+    journalEntryForm: document.getElementById('journal-entry-form'),
+    journalFormVersion: document.getElementById('journal-form-version'),
+    journalFormSnapshotNote: document.getElementById('journal-form-snapshot-note'),
+    journalFormRecipe: document.getElementById('journal-form-recipe'),
+    journalFormDose: document.getElementById('journal-form-dose'),
+    journalFormBrewedAt: document.getElementById('journal-form-brewed-at'),
+    journalFormError: document.getElementById('journal-form-error'),
+    journalFormSave: document.getElementById('journal-form-save'),
+    journalFormCancel: document.getElementById('journal-form-cancel'),
   };
 
   const DOSE_STORAGE_KEY = 'pourover-coffee:doses:v1';
   const FILTER_PARAM = Object.freeze({ method: 'filterMethod' });
+  const APP_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
   const state = {
     screen: 'library',
     method: METHODS[0],
@@ -117,6 +169,15 @@
     lastAnnouncedStep: -1,
     lastPreparationAnnouncementStep: -1,
     lastPreparationHapticStep: -1,
+    journal: {
+      entries: [],
+      entry: null,
+      demo: false,
+      filters: {},
+      formMode: 'create',
+      formSource: 'manual',
+      returnTo: 'journal',
+    },
   };
 
   function loadDoses() {
@@ -134,6 +195,47 @@
     } catch {
       // Private browsing may decline storage. The current brew still works.
     }
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function formatDate(value, includeTime = false) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    return new Intl.DateTimeFormat(undefined, includeTime
+      ? { dateStyle: 'medium', timeStyle: 'short' }
+      : { dateStyle: 'medium' }).format(date);
+  }
+
+  function toDateTimeLocal(value = new Date()) {
+    const date = new Date(value);
+    const offset = date.getTimezoneOffset() * 60_000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  async function apiFetch(path, options = {}) {
+    const headers = {
+      Accept: 'application/json',
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(APP_TOKEN ? { 'x-usernode-token': APP_TOKEN } : {}),
+      ...(options.headers || {}),
+    };
+    const response = await fetch(path, { ...options, headers });
+    if (response.status === 204) return null;
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || 'The brew journal request failed.');
+    return payload;
+  }
+
+  function recipeRouteReference(recipe) {
+    return isCurrentRecipeRevision(recipe) ? recipe.id : recipe.revisionId;
   }
 
   function freshTimer() {
@@ -229,6 +331,21 @@
     }
   }
 
+  function populateJournalControls() {
+    elements.journalFilters.elements.methodId.innerHTML = '<option value="">All methods</option>'
+      + METHODS.map((method) => `<option value="${method.id}">${method.name}</option>`).join('');
+    elements.journalFilters.elements.recipeId.innerHTML = '<option value="">All recipes</option>'
+      + RECIPES.map((recipe) => `<option value="${recipe.id}">${getMethod(recipe.methodId).name}: ${recipe.title}</option>`).join('');
+    elements.journalFormRecipe.innerHTML = RECIPES.map((recipe) => (
+      `<option value="${recipe.id}">${getMethod(recipe.methodId).name}: ${recipe.title} (v${recipe.version})</option>`
+    )).join('');
+    const ratings = '<option value="">Not rated</option>'
+      + [1, 2, 3, 4, 5].map((rating) => `<option value="${rating}">${rating}</option>`).join('');
+    elements.journalEntryForm.querySelectorAll('[data-rating]').forEach((select) => {
+      select.innerHTML = ratings;
+    });
+  }
+
   function filterLabel(key, value) {
     if (key === 'method') return getMethod(value).name;
     return getTagLabel(key, value);
@@ -277,7 +394,7 @@
   }
 
   function chooseRecipe(id) {
-    state.recipe = getRecipe(id);
+    state.recipe = getRecipeRevision(id) || getRecipe(id);
     state.method = getMethod(state.recipe.methodId);
     state.scaled = scaleRecipe(state.recipe, selectedDose(state.recipe));
     applyTheme(state.method);
@@ -299,7 +416,7 @@
     elements.recipeCharacter.textContent = `${method.name} · ${method.character}`;
     elements.recipeTitle.textContent = recipe.title;
     elements.recipeDescription.textContent = recipe.summary;
-    elements.recipeAttribution.textContent = recipe.attribution.label;
+    elements.recipeAttribution.textContent = `${recipe.attribution.label} · v${recipe.version}`;
     elements.recipeResult.textContent = recipe.result;
     elements.recipeArt.innerHTML = methodSvg(method.id);
     elements.coffeeDose.value = recipe.coffee;
@@ -356,7 +473,8 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', ...TAG_KEYS].forEach((key) => url.searchParams.delete(key));
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', ...TAG_KEYS]
+      .forEach((key) => url.searchParams.delete(key));
   }
 
   function urlFor(screen, id, shot) {
@@ -370,6 +488,27 @@
     if (screen === 'method') url.searchParams.set('method', id);
     if (screen === 'recipe') url.searchParams.set('recipe', id);
     if (screen === 'brew') url.searchParams.set('brew', id);
+    if (screen === 'journal') {
+      url.searchParams.set('journal', state.journal.demo ? 'demo' : '1');
+      if (state.journal.filters.methodId) url.searchParams.set('journalMethod', state.journal.filters.methodId);
+      if (state.journal.filters.recipeId) url.searchParams.set('journalRecipe', state.journal.filters.recipeId);
+      if (state.journal.filters.q) url.searchParams.set('journalQ', state.journal.filters.q);
+    }
+    if (screen === 'journalDetail') {
+      url.searchParams.set('journal', state.journal.demo ? 'demo' : '1');
+      url.searchParams.set('entry', id);
+    }
+    if (screen === 'journalForm') {
+      if (state.journal.formMode === 'edit') {
+        url.searchParams.set('journal', '1');
+        url.searchParams.set('edit', id);
+      } else {
+        url.searchParams.set('journal', 'new');
+        if (state.recipe?.revisionId) url.searchParams.set('recipeRef', state.recipe.revisionId);
+        if (state.scaled?.coffee) url.searchParams.set('dose', state.scaled.coffee);
+        if (state.journal.returnTo) url.searchParams.set('from', state.journal.returnTo);
+      }
+    }
     if (shot) url.searchParams.set('shot', shot);
     return `${url.pathname}${url.search}${url.hash}`;
   }
@@ -379,7 +518,11 @@
     if (screen === 'recipe' || screen === 'brew') chooseRecipe(id);
     if (screen === 'library') renderLibrary();
     if (screen === 'brew') renderBrewShell();
-    const canonicalId = screen === 'method' ? state.method.id : state.recipe.id;
+    const canonicalId = screen === 'method'
+      ? state.method.id
+      : (screen === 'recipe' || screen === 'brew')
+        ? recipeRouteReference(state.recipe)
+        : id;
     history[replace ? 'replaceState' : 'pushState']({ screen, id: canonicalId }, '', urlFor(screen, canonicalId, shot));
     showScreen(screen, { focus, transition });
   }
@@ -391,11 +534,51 @@
   }
 
   function isKnownRecipeReference(id) {
-    return RECIPES.some((recipe) => recipe.id === id) || METHODS.some((method) => method.id === id);
+    return RECIPE_REVISIONS.some((recipe) => recipe.id === id || recipe.revisionId === id)
+      || METHODS.some((method) => method.id === id);
   }
 
   function parseLocation({ focus = false } = {}) {
     const params = new URLSearchParams(window.location.search);
+    const journalMode = params.get('journal');
+    const journalEntryId = params.get('entry');
+    const journalEditId = params.get('edit');
+    if (journalMode === 'new') {
+      openJournalForm({
+        recipeRef: params.get('recipeRef'),
+        dose: params.get('dose'),
+        source: params.get('from') === 'brew' ? 'guided' : 'manual',
+        returnTo: params.get('from') || 'journal',
+        historyMode: null,
+        focus,
+        transition: 'none',
+      });
+      return;
+    }
+    if (journalEditId && journalMode === '1') {
+      openJournalEdit(journalEditId, { historyMode: null, focus, transition: 'none' });
+      return;
+    }
+    if (journalEntryId && (journalMode === '1' || journalMode === 'demo')) {
+      openJournalDetail(journalEntryId, {
+        demo: journalMode === 'demo', historyMode: null, focus, transition: 'none',
+      });
+      return;
+    }
+    if (journalMode === '1' || journalMode === 'demo') {
+      openJournal({
+        demo: journalMode === 'demo',
+        filters: {
+          methodId: METHODS.some((method) => method.id === params.get('journalMethod')) ? params.get('journalMethod') : '',
+          recipeId: RECIPES.some((recipe) => recipe.id === params.get('journalRecipe')) ? params.get('journalRecipe') : '',
+          q: (params.get('journalQ') || '').slice(0, 120),
+        },
+        historyMode: null,
+        focus,
+        transition: 'none',
+      });
+      return;
+    }
     const brewId = params.get('brew');
     const recipeId = params.get('recipe');
     const methodId = params.get('method');
@@ -440,6 +623,331 @@
     state.filters = {};
     renderLibrary();
     history.replaceState({ screen: 'library' }, '', urlFor('library'));
+  }
+
+  function journalApiPath(path = '') {
+    const query = new URLSearchParams();
+    if (state.journal.demo) query.set('demo', '1');
+    if (!path) {
+      if (state.journal.filters.methodId) query.set('methodId', state.journal.filters.methodId);
+      if (state.journal.filters.recipeId) query.set('recipeId', state.journal.filters.recipeId);
+      if (state.journal.filters.q) query.set('q', state.journal.filters.q);
+    }
+    const suffix = query.toString();
+    return `/api/brews${path}${suffix ? `?${suffix}` : ''}`;
+  }
+
+  function syncJournalFilterControls() {
+    for (const name of ['methodId', 'recipeId', 'q']) {
+      elements.journalFilters.elements[name].value = state.journal.filters[name] || '';
+    }
+    elements.journalClearFilters.hidden = Object.keys(state.journal.filters).length === 0;
+  }
+
+  function journalCard(entry) {
+    const snapshot = entry.recipeSnapshot;
+    const coffee = entry.coffeeName || 'Coffee not recorded';
+    const change = entry.changeNextTime
+      ? `<span class="journal-card-change"><strong>Next time:</strong> ${escapeHtml(entry.changeNextTime)}</span>`
+      : '<span class="journal-card-change">No adjustment recorded yet.</span>';
+    return `
+      <button class="journal-card" type="button" data-entry-id="${escapeHtml(entry.id)}">
+        <span class="journal-card-topline">
+          <span>${escapeHtml(snapshot.methodName)}</span>
+          <span>${escapeHtml(formatDate(entry.brewedAt))}</span>
+        </span>
+        <span class="journal-card-title">${escapeHtml(snapshot.title)}</span>
+        <span class="journal-card-coffee">${escapeHtml(coffee)}${entry.roaster ? ` · ${escapeHtml(entry.roaster)}` : ''}</span>
+        ${change}
+        <span class="journal-card-footer">
+          <span>v${escapeHtml(entry.recipeVersion)} · ${escapeHtml(snapshot.coffee)}g / ${escapeHtml(snapshot.water)}g</span>
+          <span>${entry.overall ? `${escapeHtml(entry.overall)}/5 overall` : 'Open entry'}</span>
+        </span>
+      </button>`;
+  }
+
+  function renderJournalList() {
+    const entries = state.journal.entries;
+    elements.journalCount.textContent = `${entries.length} ${entries.length === 1 ? 'brew' : 'brews'}`;
+    elements.journalList.innerHTML = entries.map(journalCard).join('');
+    elements.journalList.hidden = entries.length === 0;
+    elements.journalEmpty.hidden = entries.length !== 0;
+    const filtered = Object.keys(state.journal.filters).length > 0;
+    elements.journalEmptyCopy.textContent = filtered
+      ? 'No brews match these filters. Clear them to see the full journal.'
+      : 'Finish a guided brew or log one manually to begin learning from each cup.';
+    elements.journalEmptyAction.textContent = filtered ? 'Clear filters' : 'Log your first brew';
+    elements.journalStatus.textContent = state.journal.demo
+      ? 'Showing read-only staging examples. Your private journal uses the same layout.'
+      : '';
+  }
+
+  async function loadJournal() {
+    elements.journalStatus.textContent = 'Loading your brew history…';
+    elements.journalError.hidden = true;
+    elements.journalEmpty.hidden = true;
+    elements.journalList.hidden = true;
+    elements.journalCount.textContent = 'Loading brews';
+    try {
+      const payload = await apiFetch(journalApiPath());
+      state.journal.entries = payload.entries || [];
+      state.journal.demo = Boolean(payload.demo);
+      renderJournalList();
+    } catch (error) {
+      state.journal.entries = [];
+      elements.journalStatus.textContent = '';
+      elements.journalCount.textContent = 'Journal unavailable';
+      elements.journalErrorCopy.textContent = error.message;
+      elements.journalError.hidden = false;
+    }
+  }
+
+  function openJournal({ demo = false, filters = {}, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    state.journal.demo = demo;
+    state.journal.filters = Object.fromEntries(Object.entries(filters).filter(([, value]) => value));
+    syncJournalFilterControls();
+    if (historyMode) history[historyMode]({ screen: 'journal' }, '', urlFor('journal'));
+    showScreen('journal', { focus, transition });
+    loadJournal();
+  }
+
+  function definitionRows(rows) {
+    return rows.map(([label, value]) => `
+      <div class="detail-row">
+        <dt>${escapeHtml(label)}</dt>
+        <dd>${escapeHtml(value || 'Not recorded')}</dd>
+      </div>`).join('');
+  }
+
+  function renderTasteScores(entry) {
+    const labels = {
+      sweetness: 'Sweetness', acidity: 'Acidity', body: 'Body', clarity: 'Clarity', overall: 'Overall',
+    };
+    elements.journalTasteScores.innerHTML = Object.entries(labels).map(([field, label]) => {
+      const rating = Number(entry[field]) || 0;
+      const track = [1, 2, 3, 4, 5]
+        .map((value) => `<span data-filled="${value <= rating}"></span>`).join('');
+      return `<div class="taste-score-row"><span>${label}</span><span class="taste-score-track" aria-hidden="true">${track}</span><span class="taste-score-value">${rating ? `${rating}/5` : 'Not rated'}</span></div>`;
+    }).join('');
+  }
+
+  function renderJournalDetail() {
+    const entry = state.journal.entry;
+    const snapshot = entry.recipeSnapshot;
+    elements.journalDetailMethod.textContent = `${snapshot.methodName} · ${entry.source === 'guided' ? 'Guided brew' : 'Manual entry'}`;
+    elements.journalDetailTitle.textContent = entry.coffeeName || snapshot.title;
+    elements.journalDetailDate.textContent = `Brewed ${formatDate(entry.brewedAt, true)}`;
+    elements.journalDetailVersion.textContent = `${snapshot.title} · v${entry.recipeVersion}`;
+    elements.journalDemoBadge.hidden = !state.journal.demo;
+    elements.journalDetailActions.hidden = false;
+    elements.journalVersionStatus.textContent = entry.isCurrentRecipeRevision
+      ? `This is the current ${snapshot.title} revision.`
+      : `You brewed revision v${entry.recipeVersion}. The current recipe is v${entry.currentRecipeVersion}; this snapshot remains unchanged.`;
+    elements.journalSnapshotDetails.innerHTML = definitionRows([
+      ['Coffee dose', `${snapshot.coffee}g`],
+      ['Water', `${snapshot.water}g`],
+      ['Ratio', `1:${formatRatio(snapshot.ratio)}`],
+      ['Temperature', snapshot.temperature],
+      ['Grind', snapshot.grind],
+      ['Duration', formatDuration(snapshot.totalDuration)],
+      ['Published', formatDate(`${snapshot.publishedAt}T00:00:00Z`)],
+    ]);
+    elements.journalSetupDetails.innerHTML = definitionRows([
+      ['Coffee', entry.coffeeName], ['Roaster', entry.roaster], ['Process', entry.process],
+      ['Roast date', entry.roastDate ? formatDate(`${entry.roastDate}T00:00:00`) : null],
+      ['Grinder', entry.grinder], ['Grind setting', entry.grindSetting], ['Water', entry.water], ['Gear', entry.gear],
+    ]);
+    renderTasteScores(entry);
+    elements.journalDetailNotes.textContent = entry.notes || 'No tasting notes recorded.';
+    elements.journalDetailChange.textContent = entry.changeNextTime || 'No change planned yet.';
+    elements.journalDetailActions.classList.toggle('sm:grid-cols-3', !state.journal.demo);
+    elements.journalDetailActions.classList.toggle('sm:grid-cols-1', state.journal.demo);
+    elements.journalEdit.hidden = state.journal.demo;
+    elements.journalDelete.hidden = state.journal.demo;
+    elements.journalDeleteConfirmation.hidden = true;
+    elements.journalDetailError.hidden = true;
+    const revisionAvailable = Boolean(RECIPE_REVISIONS.find((recipe) => recipe.revisionId === entry.recipeRevisionId));
+    elements.journalRepeat.disabled = !revisionAvailable;
+    elements.journalRepeat.textContent = revisionAvailable ? 'Brew again' : 'Revision unavailable';
+  }
+
+  async function loadJournalEntry(id, { demo = false } = {}) {
+    state.journal.demo = demo;
+    const payload = await apiFetch(journalApiPath(`/${encodeURIComponent(id)}`));
+    state.journal.entry = payload.entry;
+    state.journal.demo = Boolean(payload.demo);
+    return payload.entry;
+  }
+
+  async function openJournalDetail(id, { demo = false, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    state.journal.demo = demo;
+    elements.journalDetailMethod.textContent = 'Brew journal';
+    elements.journalDetailTitle.textContent = 'Loading brew…';
+    elements.journalDetailDate.textContent = '';
+    elements.journalDetailError.hidden = true;
+    if (historyMode) history[historyMode]({ screen: 'journalDetail', id }, '', urlFor('journalDetail', id));
+    showScreen('journalDetail', { focus, transition });
+    try {
+      await loadJournalEntry(id, { demo });
+      renderJournalDetail();
+    } catch (error) {
+      elements.journalDetailTitle.textContent = 'Brew entry unavailable';
+      elements.journalDetailError.textContent = error.message;
+      elements.journalDetailError.hidden = false;
+      elements.journalDetailActions.hidden = true;
+    }
+  }
+
+  function setJournalFormValue(name, value) {
+    const control = elements.journalEntryForm.elements[name];
+    if (control) control.value = value ?? '';
+  }
+
+  function renderJournalFormRecipeMeta(recipe) {
+    elements.journalFormVersion.textContent = `Recipe v${recipe.version}`;
+    elements.journalFormSnapshotNote.textContent = state.journal.formMode === 'edit'
+      ? 'The original recipe revision and dose are locked so this brew record stays historically accurate.'
+      : 'Saving creates an immutable snapshot of this recipe revision.';
+  }
+
+  function prepareCreateForm({ recipeRef, dose, source = 'manual', returnTo = 'journal' } = {}) {
+    state.journal.formMode = 'create';
+    state.journal.formSource = source;
+    state.journal.returnTo = returnTo;
+    state.journal.entry = null;
+    elements.journalEntryForm.reset();
+    chooseRecipe(isKnownRecipeReference(recipeRef) ? recipeRef : RECIPES[0].id);
+    elements.journalFormRecipe.disabled = false;
+    elements.journalFormDose.disabled = false;
+    setJournalFormValue('recipeId', state.recipe.id);
+    setJournalFormValue('coffee', clampCoffee(dose ?? selectedDose(state.recipe)));
+    setJournalFormValue('brewedAt', toDateTimeLocal());
+    elements.journalFormKicker.textContent = source === 'guided' ? 'Guided brew complete' : 'New journal entry';
+    elements.journalFormTitle.textContent = source === 'guided' ? 'Save this brew' : 'Log a brew';
+    elements.journalFormIntro.textContent = source === 'guided'
+      ? 'The recipe and dose are ready. Add the coffee, setup, and tasting notes you want to remember.'
+      : 'Record what you used and how the cup tasted. Only the recipe, dose, and brew time are required.';
+    elements.journalFormSave.textContent = 'Save journal entry';
+    elements.journalFormError.hidden = true;
+    renderJournalFormRecipeMeta(state.recipe);
+  }
+
+  function prepareEditForm(entry) {
+    state.journal.formMode = 'edit';
+    state.journal.formSource = entry.source;
+    state.journal.returnTo = 'detail';
+    state.journal.entry = entry;
+    elements.journalEntryForm.reset();
+    const recipe = RECIPE_REVISIONS.find((candidate) => candidate.revisionId === entry.recipeRevisionId)
+      || getRecipe(entry.recipeId);
+    state.recipe = recipe;
+    state.method = getMethod(recipe.methodId);
+    state.scaled = scaleRecipe(recipe, entry.recipeSnapshot.coffee);
+    elements.journalFormRecipe.disabled = true;
+    elements.journalFormDose.disabled = true;
+    setJournalFormValue('recipeId', entry.recipeId);
+    setJournalFormValue('coffee', entry.recipeSnapshot.coffee);
+    setJournalFormValue('brewedAt', toDateTimeLocal(entry.brewedAt));
+    for (const field of ['coffeeName', 'roaster', 'process', 'roastDate', 'grinder', 'grindSetting', 'water', 'gear', 'sweetness', 'acidity', 'body', 'clarity', 'overall', 'notes', 'changeNextTime']) {
+      setJournalFormValue(field, entry[field]);
+    }
+    elements.journalFormKicker.textContent = 'Edit private notes';
+    elements.journalFormTitle.textContent = entry.coffeeName || entry.recipeSnapshot.title;
+    elements.journalFormIntro.textContent = 'Update what you used or how the cup tasted. The recipe snapshot stays unchanged.';
+    elements.journalFormSave.textContent = 'Save changes';
+    elements.journalFormError.hidden = true;
+    renderJournalFormRecipeMeta(recipe);
+  }
+
+  function openJournalForm(options = {}) {
+    prepareCreateForm(options);
+    if (options.historyMode !== null) {
+      history[options.historyMode || 'pushState']({ screen: 'journalForm' }, '', urlFor('journalForm'));
+    }
+    showScreen('journalForm', { focus: options.focus !== false, transition: options.transition || 'push' });
+  }
+
+  async function openJournalEdit(id, { historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    try {
+      const entry = state.journal.entry?.id === Number(id)
+        ? state.journal.entry
+        : await loadJournalEntry(id);
+      prepareEditForm(entry);
+      if (historyMode) history[historyMode]({ screen: 'journalForm', id }, '', urlFor('journalForm', id));
+      showScreen('journalForm', { focus, transition });
+    } catch (error) {
+      elements.journalDetailError.textContent = error.message;
+      elements.journalDetailError.hidden = false;
+    }
+  }
+
+  function readJournalForm() {
+    return Object.fromEntries(new FormData(elements.journalEntryForm).entries());
+  }
+
+  async function saveJournalForm(event) {
+    event.preventDefault();
+    elements.journalFormError.hidden = true;
+    elements.journalFormSave.disabled = true;
+    elements.journalFormSave.textContent = 'Saving…';
+    try {
+      const body = readJournalForm();
+      let payload;
+      if (state.journal.formMode === 'edit') {
+        payload = await apiFetch(`/api/brews/${state.journal.entry.id}`, {
+          method: 'PATCH', body: JSON.stringify(body),
+        });
+      } else {
+        body.recipeId = state.recipe.id;
+        body.recipeVersion = state.recipe.version;
+        body.coffee = elements.journalFormDose.value;
+        body.source = state.journal.formSource;
+        payload = await apiFetch('/api/brews', { method: 'POST', body: JSON.stringify(body) });
+      }
+      state.journal.entry = payload.entry;
+      state.journal.demo = false;
+      await openJournalDetail(payload.entry.id, { historyMode: 'replaceState', transition: 'pop' });
+    } catch (error) {
+      elements.journalFormError.textContent = error.message;
+      elements.journalFormError.hidden = false;
+    } finally {
+      elements.journalFormSave.disabled = false;
+      elements.journalFormSave.textContent = state.journal.formMode === 'edit' ? 'Save changes' : 'Save journal entry';
+    }
+  }
+
+  function commitJournalFilters() {
+    state.journal.filters = Object.fromEntries(['methodId', 'recipeId', 'q']
+      .map((name) => [name, elements.journalFilters.elements[name].value.trim()])
+      .filter(([, value]) => value));
+    syncJournalFilterControls();
+    history.replaceState({ screen: 'journal' }, '', urlFor('journal'));
+    loadJournal();
+  }
+
+  function repeatJournalEntry() {
+    const entry = state.journal.entry;
+    const recipe = RECIPE_REVISIONS.find((candidate) => candidate.revisionId === entry.recipeRevisionId);
+    if (!recipe) return;
+    state.doses[recipe.id] = entry.recipeSnapshot.coffee;
+    saveDoses();
+    state.timer = freshTimer();
+    navigate('brew', recipeRouteReference(recipe), { transition: 'push' });
+  }
+
+  async function deleteJournalEntry() {
+    elements.journalDeleteConfirm.disabled = true;
+    elements.journalDetailError.hidden = true;
+    try {
+      await apiFetch(`/api/brews/${state.journal.entry.id}`, { method: 'DELETE' });
+      state.journal.entry = null;
+      openJournal({ historyMode: 'replaceState', transition: 'pop' });
+    } catch (error) {
+      elements.journalDetailError.textContent = error.message;
+      elements.journalDetailError.hidden = false;
+    } finally {
+      elements.journalDeleteConfirm.disabled = false;
+    }
   }
 
   function elapsedNow() {
@@ -635,22 +1143,88 @@
   });
   elements.startBrew.addEventListener('click', () => {
     state.timer = freshTimer();
-    navigate('brew', state.recipe.id, { transition: 'push' });
+    navigate('brew', recipeRouteReference(state.recipe), { transition: 'push' });
   });
   elements.timerToggle.addEventListener('click', toggleTimer);
   elements.previousStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex - 1));
   elements.nextStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex + 1));
   elements.resetTimer.addEventListener('click', resetTimer);
+  elements.saveBrewNotes.addEventListener('click', () => openJournalForm({
+    recipeRef: state.recipe.revisionId,
+    dose: state.scaled.coffee,
+    source: 'guided',
+    returnTo: 'brew',
+  }));
   elements.brewAgain.addEventListener('click', () => { resetTimer(); toggleTimer(); });
-  elements.returnToRecipe.addEventListener('click', () => navigate('recipe', state.recipe.id, { transition: 'pop' }));
+  elements.returnToRecipe.addEventListener('click', () => navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' }));
+  elements.journalButton.addEventListener('click', () => openJournal());
+  elements.journalNew.addEventListener('click', () => openJournalForm());
+  elements.journalEmptyAction.addEventListener('click', () => {
+    if (Object.keys(state.journal.filters).length) {
+      state.journal.filters = {};
+      syncJournalFilterControls();
+      history.replaceState({ screen: 'journal' }, '', urlFor('journal'));
+      loadJournal();
+    } else {
+      openJournalForm();
+    }
+  });
+  elements.journalRetry.addEventListener('click', loadJournal);
+  elements.journalList.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-entry-id]');
+    if (card) openJournalDetail(card.dataset.entryId, { demo: state.journal.demo });
+  });
+  elements.journalFilters.addEventListener('submit', (event) => {
+    event.preventDefault();
+    commitJournalFilters();
+  });
+  elements.journalFilters.elements.methodId.addEventListener('change', commitJournalFilters);
+  elements.journalFilters.elements.recipeId.addEventListener('change', commitJournalFilters);
+  elements.journalFilters.elements.q.addEventListener('blur', commitJournalFilters);
+  elements.journalClearFilters.addEventListener('click', () => {
+    state.journal.filters = {};
+    syncJournalFilterControls();
+    history.replaceState({ screen: 'journal' }, '', urlFor('journal'));
+    loadJournal();
+  });
+  elements.journalRepeat.addEventListener('click', repeatJournalEntry);
+  elements.journalEdit.addEventListener('click', () => openJournalEdit(state.journal.entry.id));
+  elements.journalDelete.addEventListener('click', () => {
+    elements.journalDeleteConfirmation.hidden = false;
+    elements.journalDeleteConfirm.focus();
+  });
+  elements.journalDeleteCancel.addEventListener('click', () => {
+    elements.journalDeleteConfirmation.hidden = true;
+    elements.journalDelete.focus();
+  });
+  elements.journalDeleteConfirm.addEventListener('click', deleteJournalEntry);
+  elements.journalFormRecipe.addEventListener('change', () => {
+    chooseRecipe(elements.journalFormRecipe.value);
+    elements.journalFormDose.value = selectedDose(state.recipe);
+    renderJournalFormRecipeMeta(state.recipe);
+  });
+  elements.journalEntryForm.addEventListener('submit', saveJournalForm);
+  elements.journalFormCancel.addEventListener('click', () => {
+    if (state.journal.formMode === 'edit') {
+      openJournalDetail(state.journal.entry.id, { historyMode: 'replaceState', transition: 'pop' });
+    } else if (state.journal.returnTo === 'brew') {
+      navigate('brew', recipeRouteReference(state.recipe), { replace: true, transition: 'pop' });
+    } else {
+      openJournal({ historyMode: 'replaceState', transition: 'pop' });
+    }
+  });
   elements.about.addEventListener('click', openAbout);
   elements.home.addEventListener('click', () => {
     state.filters = {};
     navigate('library', null, { transition: 'pop' });
   });
   elements.back.addEventListener('click', () => {
-    if (state.screen === 'brew') navigate('recipe', state.recipe.id, { transition: 'pop' });
+    if (state.screen === 'brew') navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' });
     else if (state.screen === 'recipe') navigate('method', state.recipe.methodId, { transition: 'pop' });
+    else if (state.screen === 'journalDetail') openJournal({ demo: state.journal.demo, historyMode: 'replaceState', transition: 'pop' });
+    else if (state.screen === 'journalForm' && state.journal.formMode === 'edit') openJournalDetail(state.journal.entry.id, { historyMode: 'replaceState', transition: 'pop' });
+    else if (state.screen === 'journalForm' && state.journal.returnTo === 'brew') navigate('brew', recipeRouteReference(state.recipe), { replace: true, transition: 'pop' });
+    else if (state.screen === 'journalForm') openJournal({ historyMode: 'replaceState', transition: 'pop' });
     else navigate('library', null, { transition: 'pop' });
   });
 
@@ -658,5 +1232,6 @@
   window.addEventListener('pagehide', cancelTimerTick);
 
   populateFilters();
+  populateJournalControls();
   parseLocation();
 })();

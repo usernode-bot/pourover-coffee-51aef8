@@ -28,6 +28,9 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?filterMethod=v60&roast=light&profile=sweet',
     '/?recipe=v60-bright',
     '/?brew=v60-bright&shot=active',
+    '/?journal=demo',
+    '/?journal=demo&entry=demo-v60',
+    '/?journal=new',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'brew.guided-timer');
@@ -35,6 +38,10 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[2].expectText, 'Sweet pulse');
   assert.equal(manifest.tests[3].expectText, 'Pourover Coffee original');
   assert.equal(manifest.tests[4].expectText, 'Get ready');
+  assert.equal(manifest.tests[5].expectText, 'Staging demo: Finca El Jardín');
+  assert.equal(manifest.tests[6].expectText, 'Brew snapshot');
+  assert.equal(manifest.tests[7].expectText, 'What did you use?');
+  assert.ok(manifest.tests.slice(5).every((entry) => entry.visual));
 });
 
 test('the shell has separate method, discovery, detail, and brew surfaces', () => {
@@ -64,8 +71,36 @@ test('the guided timer includes an accessible non-ticking upcoming-step preview'
   assert.match(source, /navigator\.vibrate\?\.\(\[12, 36, 12\]\)/);
 });
 
+test('the private journal exposes history, detail, and edit surfaces from completed brews', () => {
+  const html = read('public/index.html');
+  const client = read('public/app.js');
+  const server = read('server.js');
+  const store = read('journal-store.js');
+
+  assert.match(html, /id="save-brew-notes"/);
+  assert.match(html, /id="journal-screen"/);
+  assert.match(html, /id="journal-detail-screen"/);
+  assert.match(html, /id="journal-form-screen"/);
+  assert.match(html, /id="journal-delete-confirmation"[^>]+hidden/);
+  assert.match(client, /'x-usernode-token': APP_TOKEN/);
+  assert.match(client, /method: 'PATCH'/);
+  assert.match(client, /method: 'DELETE'/);
+  assert.match(server, /app\.post\('\/api\/brews'/);
+  assert.match(server, /app\.patch\('\/api\/brews\/:id'/);
+  assert.match(server, /app\.delete\('\/api\/brews\/:id'/);
+  assert.match(store, /COMMENT ON TABLE brew_journal_entries IS 'staging:private'/);
+  assert.match(store, /recipe_snapshot JSONB NOT NULL/);
+});
+
+test('recipe navigation retains exact historical revision links', () => {
+  const source = read('public/app.js');
+  assert.match(source, /recipeRouteReference\(recipe\)/);
+  assert.match(source, /entry\.recipeRevisionId/);
+  assert.match(source, /The current recipe is v/);
+});
+
 test('user-facing product files contain no em dash encoding', () => {
-  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'dapp.json']) {
+  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'server.js', 'journal-store.js', 'dapp.json']) {
     const source = read(file);
     assert.doesNotMatch(source, /—|&mdash;|&#8212;|\\u2014/, file);
   }

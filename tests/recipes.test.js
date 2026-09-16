@@ -8,14 +8,18 @@ const {
   METHODS,
   MIN_COFFEE_GRAMS,
   RECIPES,
+  RECIPE_REVISIONS,
   TAG_KEYS,
   TAG_TAXONOMY,
   clampCoffee,
+  createRecipeSnapshot,
   filterRecipes,
   getBrewTiming,
   getPreparationLead,
   getRecipe,
+  getRecipeRevision,
   getRecipesForMethod,
+  isCurrentRecipeRevision,
   normalizeFilters,
   resolveRecipeId,
   scaleRecipe,
@@ -145,4 +149,34 @@ test('the last brew step has no stale upcoming action', () => {
   assert.equal(timing.nextStepIndex, null);
   assert.equal(timing.secondsUntilNext, null);
   assert.equal(timing.isFinalStep, true);
+});
+
+test('the original recipe library is an explicit first revision of every stable recipe', () => {
+  assert.equal(RECIPE_REVISIONS.length, 15);
+  assert.equal(RECIPES.length, 15);
+  for (const recipe of RECIPES) {
+    assert.equal(recipe.version, 1, recipe.id);
+    assert.equal(recipe.revisionId, `${recipe.id}@1`);
+    assert.equal(getRecipeRevision(recipe.id, 1), recipe);
+    assert.equal(getRecipeRevision(recipe.revisionId), recipe);
+    assert.equal(isCurrentRecipeRevision(recipe), true);
+    assert.equal(Object.isFrozen(recipe), true);
+    assert.equal(Object.isFrozen(recipe.tags), true);
+    assert.equal(Object.isFrozen(recipe.steps), true);
+  }
+  assert.equal(getRecipeRevision('v60-bright', 99), null);
+});
+
+test('recipe snapshots preserve the exact revision and scaled brew instructions', () => {
+  const snapshot = createRecipeSnapshot('v60-sweet-pulse@1', 21);
+  assert.equal(snapshot.id, 'v60-sweet-pulse');
+  assert.equal(snapshot.version, 1);
+  assert.equal(snapshot.revisionId, 'v60-sweet-pulse@1');
+  assert.equal(snapshot.coffee, 21);
+  assert.equal(snapshot.water, Math.round(21 * snapshot.ratio));
+  assert.equal(snapshot.steps.at(-1).target, snapshot.water);
+  assert.ok(snapshot.steps.every((step) => step.instruction && step.preparation));
+  assert.equal(Object.isFrozen(snapshot), true);
+  assert.equal(Object.isFrozen(snapshot.steps), true);
+  assert.equal(Object.isFrozen(snapshot.steps[0]), true);
 });

@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "express": "^4.21.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "tailwindcss": "3.4.17"

@@ -36,6 +36,45 @@
         "styles/**",
         "dapp.json"
       ]
+    },
+    {
+      "id": "journal.history",
+      "name": "Brew journal renders private history",
+      "path": "/?journal=demo",
+      "expectText": "Staging demo: Finca El Jardín",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "server.js",
+        "journal-store.js",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "journal.snapshot",
+      "name": "Journal entry preserves an exact recipe snapshot",
+      "path": "/?journal=demo&entry=demo-v60",
+      "expectText": "Brew snapshot",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "server.js",
+        "journal-store.js",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "journal.form",
+      "name": "Manual brew journal form renders",
+      "path": "/?journal=new",
+      "expectText": "What did you use?",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "server.js",
+        "journal-store.js",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {
