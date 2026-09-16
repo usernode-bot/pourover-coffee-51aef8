@@ -73,6 +73,7 @@
   <script src="/usernode-bridge/v1/bridge.js" defer></script>
   <script src="/usernode-native/v1/native.js" defer></script>
   <script src="/recipes.js" defer></script>
+  <script src="/glossary.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body class="min-h-screen text-[#2c211a] antialiased">
@@ -91,7 +92,10 @@
             <span class="block text-sm font-semibold tracking-tight text-[#2c211a]">Pourover Coffee</span>
           </span>
         </button>
-        <button id="about-button" class="text-button un-touch-target" type="button">About</button>
+        <div class="flex items-center gap-1">
+          <button id="glossary-button" class="text-button un-touch-target" type="button">Glossary</button>
+          <button id="about-button" class="text-button un-touch-target" type="button">About</button>
+        </div>
       </div>
     </header>
 
@@ -137,11 +141,26 @@
 
           <form id="recipe-filters" class="filter-grid mt-5" aria-label="Filter recipes">
             <label class="filter-field"><span>Method</span><select name="method"></select></label>
-            <label class="filter-field"><span>Roast</span><select name="roast"></select></label>
-            <label class="filter-field"><span>Cup profile</span><select name="profile"></select></label>
-            <label class="filter-field"><span>Technique</span><select name="technique"></select></label>
-            <label class="filter-field"><span>Experience</span><select name="experience"></select></label>
-            <label class="filter-field"><span>Serving</span><select name="serving"></select></label>
+            <label class="filter-field">
+              <span class="filter-label"><span>Roast</span><button class="term-mark" type="button" data-term="roast-level" aria-label="What does roast mean?">?</button></span>
+              <select name="roast"></select>
+            </label>
+            <label class="filter-field">
+              <span class="filter-label"><span>Cup profile</span><button class="term-mark" type="button" data-term="cup-profile" aria-label="What does cup profile mean?">?</button></span>
+              <select name="profile"></select>
+            </label>
+            <label class="filter-field">
+              <span class="filter-label"><span>Technique</span><button class="term-mark" type="button" data-term="technique-facet" aria-label="What does technique mean?">?</button></span>
+              <select name="technique"></select>
+            </label>
+            <label class="filter-field">
+              <span class="filter-label"><span>Experience</span><button class="term-mark" type="button" data-term="experience-facet" aria-label="What does experience mean here?">?</button></span>
+              <select name="experience"></select>
+            </label>
+            <label class="filter-field">
+              <span class="filter-label"><span>Serving</span><button class="term-mark" type="button" data-term="serving-size" aria-label="What does serving mean?">?</button></span>
+              <select name="serving"></select>
+            </label>
           </form>
 
           <div class="mt-4 flex flex-wrap items-center gap-2">
@@ -231,9 +250,9 @@
               <p class="eyebrow">At a glance</p>
               <h2 id="details-heading" class="sr-only">Recipe details</h2>
               <dl class="mt-3 divide-y divide-[#e6ddd1]">
-                <div class="detail-row"><dt>Ratio</dt><dd id="recipe-ratio"></dd></div>
-                <div class="detail-row"><dt>Water</dt><dd id="recipe-temperature"></dd></div>
-                <div class="detail-row"><dt>Grind</dt><dd id="recipe-grind"></dd></div>
+                <div class="detail-row"><dt id="recipe-ratio-label">Ratio</dt><dd id="recipe-ratio"></dd></div>
+                <div class="detail-row"><dt id="recipe-water-label">Water</dt><dd id="recipe-temperature"></dd></div>
+                <div class="detail-row"><dt id="recipe-grind-label">Grind</dt><dd id="recipe-grind"></dd></div>
                 <div class="detail-row"><dt>Time</dt><dd id="recipe-duration"></dd></div>
                 <div class="detail-row"><dt>Difficulty</dt><dd id="recipe-difficulty"></dd></div>
               </dl>
@@ -265,6 +284,36 @@
         </div>
       </section>
 
+      <section id="glossary-screen" class="screen" data-screen="glossary" data-active="false" aria-labelledby="glossary-title" hidden>
+        <div class="glossary-hero rounded-[2rem] p-5 sm:p-8">
+          <div class="relative z-10 max-w-2xl">
+            <p class="eyebrow">Brewing glossary</p>
+            <h1 id="glossary-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Terms, in plain language</h1>
+            <p class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base">Short answers for the words that show up in recipes, filters, and the timer. Open any term from wherever you meet it, or browse the whole list here.</p>
+            <label class="glossary-search mt-5">
+              <span class="sr-only">Search glossary terms</span>
+              <input id="glossary-search" type="search" placeholder="Search terms" autocomplete="off" spellcheck="false">
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-6 flex items-end justify-between gap-4 px-1">
+          <div>
+            <p class="eyebrow">All terms</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#2c211a]">What does that mean?</h2>
+          </div>
+          <p id="glossary-result-count" class="shrink-0 text-sm font-semibold text-[#6d5849]" aria-live="polite"></p>
+        </div>
+
+        <div id="glossary-list" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Glossary terms"></div>
+        <div id="glossary-empty-state" class="empty-state mt-5" hidden>
+          <span aria-hidden="true">✎</span>
+          <h3>No terms match that search</h3>
+          <p>Try a shorter word, like grind or body.</p>
+          <button id="glossary-clear-search" class="outline-button" type="button">Clear search</button>
+        </div>
+      </section>
+
       <section id="brew-screen" class="screen" data-screen="brew" data-active="false" aria-labelledby="brew-title" hidden>
         <div class="mx-auto max-w-3xl">
           <div class="flex items-start justify-between gap-4 px-1">
@@ -288,7 +337,7 @@
               </div>
             </div>
 
-            <div class="mt-6 text-center" aria-live="polite" aria-atomic="true">
+            <div class="mt-6 text-center">
               <p id="active-step-number" class="eyebrow">Step 1 of 4</p>
               <h2 id="active-step-label" class="mt-1 text-3xl font-semibold tracking-[-0.04em]">Bloom</h2>
               <div class="mt-3 inline-flex items-baseline gap-1 rounded-full bg-[#2f241d] px-4 py-2 text-[#f8f1e8]">
@@ -350,6 +399,26 @@
     <footer class="un-safe-bottom px-4 pb-5 text-center text-[11px] font-medium uppercase tracking-[0.16em] text-[#a28c78]">
       Brew slowly. Taste curiously.
     </footer>
+  </div>
+
+  <div id="term-panel" class="term-panel" role="dialog" aria-modal="true" aria-labelledby="term-panel-title" hidden>
+    <button id="term-panel-backdrop" class="term-panel-backdrop" type="button" tabindex="-1" aria-label="Close definition"></button>
+    <div class="term-panel-card">
+      <div class="term-panel-handle" aria-hidden="true"></div>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p id="term-panel-category" class="eyebrow"></p>
+          <h2 id="term-panel-title" tabindex="-1" class="mt-1 text-2xl font-semibold tracking-[-0.04em]"></h2>
+        </div>
+        <button id="term-panel-close" class="icon-button un-touch-target" type="button" aria-label="Close definition">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p id="term-panel-summary" class="term-panel-summary"></p>
+      <p id="term-panel-detail" class="term-panel-detail"></p>
+      <div id="term-panel-related" class="term-panel-related"></div>
+      <button id="term-panel-done" class="outline-button mt-6 w-full justify-center" type="button">Browse all terms</button>
+    </div>
   </div>
 
   <template id="about-content">

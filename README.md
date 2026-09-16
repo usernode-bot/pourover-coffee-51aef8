@@ -15,6 +15,11 @@ brewing.
 - Filters the recipe library by method, roast, cup profile, technique,
   experience, and serving size. Filters combine across facets and remain in
   the URL so a result set can be shared or checked directly.
+- Explains brewing terms in context: every filter label, recipe tag, detail
+  row, and specialized timer step opens a plain-language definition without
+  losing timer or form state.
+- Provides a searchable glossary grouped by category, plus a direct link to
+  any single definition.
 - Guides a brew with a timestamp-based timer that stays accurate after the
   page has been in the background.
 - Keeps the next action visible with its scheduled time, countdown, scaled
@@ -50,7 +55,11 @@ uses no database for its current feature set.
 - `public/app.css`: the coffee-and-paper visual system.
 - `public/recipes.js`: method metadata, recipe definitions, tag taxonomy,
   filtering, legacy-link resolution, and dose-scaling logic.
+- `public/glossary.js`: glossary copy, category grouping, search, and the
+  mappings from taxonomy values and timer steps to terms.
 - `public/app.js`: navigation, rendering, local preferences, and the timer.
 - `server.js`: Homeroom authentication, static serving, deep links, and
   graceful shutdown.
+- `tests/glossary.test.js`: content-integrity checks for glossary copy,
+  taxonomy coverage, and step mappings.
 - `dapp.json`: the app icon and proposal checks.

@@ -36,6 +36,30 @@
         "styles/**",
         "dapp.json"
       ]
+    },
+    {
+      "name": "Glossary browses every term",
+      "path": "/?glossary=1",
+      "expectSelector": "#glossary-list [data-term]"
+    },
+    {
+      "name": "Glossary search narrows the list",
+      "path": "/?glossary=1&q=drawdown",
+      "expectText": "Drawdown"
+    },
+    {
+      "id": "glossary.term-panel",
+      "name": "A term opens a definition panel",
+      "path": "/?glossary=1&term=bloom",
+      "expectText": "wets the coffee and lets gas escape",
+      "visual": true,
+      "impact": [
+        "public/glossary.js",
+        "public/app.js",
+        "public/index.html",
+        "public/app.css",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {
