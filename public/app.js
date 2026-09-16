@@ -22,11 +22,21 @@
     scaleRecipe,
   } = window.PouroverRecipes;
 
+  const {
+    getGlossaryTerm,
+    getGlossaryTermForFacet,
+    getGlossaryTermForStep,
+    getGlossaryTermsForFilter,
+    glossaryTermsByCategory,
+    searchGlossary,
+  } = window.PouroverGlossary;
+
   const screens = {
     library: document.getElementById('library-screen'),
     method: document.getElementById('method-screen'),
     recipe: document.getElementById('recipe-screen'),
     brew: document.getElementById('brew-screen'),
+    glossary: document.getElementById('glossary-screen'),
   };
 
   const elements = {
@@ -101,6 +111,24 @@
     brewComplete: document.getElementById('brew-complete'),
     brewAgain: document.getElementById('brew-again'),
     returnToRecipe: document.getElementById('return-to-recipe'),
+    glossary: document.getElementById('glossary-button'),
+    glossarySearch: document.getElementById('glossary-search'),
+    glossaryList: document.getElementById('glossary-list'),
+    glossaryResultCount: document.getElementById('glossary-result-count'),
+    glossaryEmptyState: document.getElementById('glossary-empty-state'),
+    glossaryClearSearch: document.getElementById('glossary-clear-search'),
+    termPanel: document.getElementById('term-panel'),
+    termPanelBackdrop: document.getElementById('term-panel-backdrop'),
+    termPanelCategory: document.getElementById('term-panel-category'),
+    termPanelTitle: document.getElementById('term-panel-title'),
+    termPanelSummary: document.getElementById('term-panel-summary'),
+    termPanelDetail: document.getElementById('term-panel-detail'),
+    termPanelRelated: document.getElementById('term-panel-related'),
+    termPanelClose: document.getElementById('term-panel-close'),
+    termPanelDone: document.getElementById('term-panel-done'),
+    recipeRatioLabel: document.getElementById('recipe-ratio-label'),
+    recipeWaterLabel: document.getElementById('recipe-water-label'),
+    recipeGrindLabel: document.getElementById('recipe-grind-label'),
   };
 
   const DOSE_STORAGE_KEY = 'pourover-coffee:doses:v1';
@@ -112,6 +140,11 @@
     scaled: scaleRecipe(RECIPES[0], RECIPES[0].defaultCoffee),
     doses: loadDoses(),
     filters: {},
+    glossaryQuery: '',
+    term: { open: false, id: null, trigger: null },
+    lastActiveStepLabel: null,
+    lastNextStepLabel: null,
+    lastRenderedStep: null,
     timer: freshTimer(),
     timerHandle: null,
     lastAnnouncedStep: -1,
@@ -310,20 +343,30 @@
     elements.recipeDuration.textContent = formatDuration(recipe.totalDuration);
     elements.recipeDifficulty.textContent = recipe.difficulty;
     elements.recipeEquipment.textContent = `You will need: ${method.equipment}.`;
+    elements.recipeRatioLabel.innerHTML = `Ratio${termMark('brew-ratio', 'Brew ratio')}`;
+    elements.recipeWaterLabel.innerHTML = `Water${termMark('water-temperature', 'Water temperature')}`;
+    elements.recipeGrindLabel.innerHTML = `Grind${termMark('grind-size', 'Grind size')}`;
     elements.recipeTagGroups.innerHTML = TAG_KEYS.map((facet) => {
-      const values = recipe.tags[facet].map((value) => getTagLabel(facet, value)).join(', ');
-      return `<div class="recipe-tag-group"><dt>${TAG_TAXONOMY[facet].label}</dt><dd>${values}</dd></div>`;
+      const values = recipe.tags[facet].map((value) => {
+        const term = getGlossaryTermsForFilter(facet, value);
+        return term ? termTrigger(term.id, getTagLabel(facet, value)) : escapeHtml(getTagLabel(facet, value));
+      }).join(', ');
+      return `<div class="recipe-tag-group"><dt>${escapeHtml(TAG_TAXONOMY[facet].label)}</dt><dd>${values}</dd></div>`;
     }).join('');
     elements.stepCount.textContent = `${recipe.steps.length} steps`;
-    elements.recipeSteps.innerHTML = recipe.steps.map((recipeStep, index) => `
+    elements.recipeSteps.innerHTML = recipe.steps.map((recipeStep, index) => {
+      const stepTerm = getGlossaryTermForStep(recipeStep.label);
+      const label = stepTerm ? termTrigger(stepTerm.id, recipeStep.label) : escapeHtml(recipeStep.label);
+      return `
       <li class="recipe-step">
         <span class="step-index">${index + 1}</span>
         <span>
-          <span class="block text-sm font-semibold">${recipeStep.label}</span>
-          <span class="mt-1 block text-xs leading-5 text-[#806d5e]">${recipeStep.instruction}</span>
+          <span class="recipe-step-label block text-sm font-semibold">${label}</span>
+          <span class="mt-1 block text-xs leading-5 text-[#806d5e]">${escapeHtml(recipeStep.instruction)}</span>
         </span>
         <span class="step-target">${recipeStep.target ? `${recipeStep.target}g` : 'Prep'} · ${formatDuration(recipeStep.duration)}</span>
-      </li>`).join('');
+      </li>`;
+    }).join('');
     elements.doseMinus.disabled = recipe.coffee <= MIN_COFFEE_GRAMS;
     elements.dosePlus.disabled = recipe.coffee >= MAX_COFFEE_GRAMS;
   }
@@ -334,6 +377,112 @@
     saveDoses();
     state.scaled = scaleRecipe(state.recipe, coffee);
     renderRecipe();
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[char]));
+  }
+
+  // A definition the reader can open by keyboard or pointer. The trigger is a
+  // real button, so no essential instruction is ever hidden behind a tooltip:
+  // the surrounding copy is complete on its own and the definition adds depth.
+  function termTrigger(termId, label) {
+    const term = getGlossaryTerm(termId);
+    if (!term) return escapeHtml(label);
+    return `<button class="term-link" type="button" data-term="${term.id}" aria-label="Definition of ${escapeHtml(label)}"><span>${escapeHtml(label)}</span><span class="term-link-mark" aria-hidden="true">?</span></button>`;
+  }
+
+  function termMark(termId, label) {
+    const term = getGlossaryTerm(termId);
+    if (!term) return '';
+    return `<button class="term-mark" type="button" data-term="${term.id}" aria-label="Definition of ${escapeHtml(label)}">?</button>`;
+  }
+
+  // The timer's active and upcoming step names get the same treatment as the
+  // recipe step list, so a term can be opened mid-brew without losing state.
+  // The timer re-renders several times a second, so only rewrite the label
+  // when it actually changed: replacing it every tick would destroy the
+  // definition button and drop focus out from under a keyboard user.
+  function setStepLabel(el, label, cacheKey) {
+    if (state[cacheKey] === label) return;
+    state[cacheKey] = label;
+    const term = getGlossaryTermForStep(label);
+    el.innerHTML = term ? termTrigger(term.id, label) : escapeHtml(label);
+  }
+
+  function renderActiveStepLabel(label) {
+    setStepLabel(elements.activeStepLabel, label, 'lastActiveStepLabel');
+  }
+
+  function renderNextStepLabel(label) {
+    setStepLabel(elements.nextStepLabel, label, 'lastNextStepLabel');
+  }
+
+  function renderGlossary() {
+    const matches = searchGlossary(state.glossaryQuery);
+    const searching = Boolean(state.glossaryQuery.trim());
+    if (searching) {
+      elements.glossaryList.innerHTML = matches.map(glossaryCard).join('');
+    } else {
+      elements.glossaryList.innerHTML = glossaryTermsByCategory().map((group) => `
+        <div class="glossary-group">
+          <h3 class="glossary-group-heading">${escapeHtml(group.category)}</h3>
+          <div class="glossary-group-cards">${group.terms.map(glossaryCard).join('')}</div>
+        </div>`).join('');
+    }
+    elements.glossaryResultCount.textContent = `${matches.length} ${matches.length === 1 ? 'term' : 'terms'}`;
+    elements.glossaryList.hidden = matches.length === 0;
+    elements.glossaryEmptyState.hidden = matches.length !== 0;
+    // Only write the field when it differs, so typing never moves the caret.
+    if (elements.glossarySearch.value !== state.glossaryQuery) elements.glossarySearch.value = state.glossaryQuery;
+  }
+
+  function glossaryCard(term) {
+    return `
+      <button class="glossary-card un-pressable" type="button" data-term="${term.id}" aria-label="Definition of ${escapeHtml(term.term)}">
+        <span class="glossary-card-category">${escapeHtml(term.category)}</span>
+        <span class="glossary-card-term">${escapeHtml(term.term)}</span>
+        <span class="glossary-card-summary">${escapeHtml(term.summary)}</span>
+      </button>`;
+  }
+
+  function openTerm(termId, trigger) {
+    const term = getGlossaryTerm(termId);
+    if (!term) return;
+    state.term = { open: true, id: term.id, trigger: trigger || null };
+    elements.termPanelCategory.textContent = term.category;
+    elements.termPanelTitle.textContent = term.term;
+    elements.termPanelSummary.textContent = term.summary;
+    elements.termPanelDetail.textContent = term.detail;
+    const related = term.seeAlso.map((id) => getGlossaryTerm(id)).filter(Boolean);
+    elements.termPanelRelated.hidden = related.length === 0;
+    elements.termPanelRelated.innerHTML = related.length
+      ? `<p class="term-panel-related-label">Related terms</p>${related.map((entry) => `<button class="term-chip" type="button" data-term="${entry.id}">${escapeHtml(entry.term)}</button>`).join('')}`
+      : '';
+    elements.termPanel.hidden = false;
+    document.body.classList.add('term-open');
+    // Take the screens behind the panel out of the tab order and the
+    // accessibility tree, so the definition is genuinely modal for keyboard
+    // and screen-reader users rather than only visually on top.
+    document.getElementById('app-shell').inert = true;
+    elements.termPanelTitle.focus({ preventScroll: true });
+  }
+
+  function closeTerm({ restoreFocus = true } = {}) {
+    if (!state.term.open) return;
+    const trigger = state.term.trigger;
+    state.term = { open: false, id: null, trigger: null };
+    elements.termPanel.hidden = true;
+    document.body.classList.remove('term-open');
+    document.getElementById('app-shell').inert = false;
+    if (restoreFocus && trigger && document.contains(trigger)) trigger.focus({ preventScroll: true });
+  }
+
+  function openGlossary() {
+    closeTerm({ restoreFocus: false });
+    navigate('glossary', null, { transition: 'push' });
   }
 
   function showScreen(screen, { focus = true, transition = 'none' } = {}) {
@@ -356,7 +505,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', ...TAG_KEYS].forEach((key) => url.searchParams.delete(key));
+    ['method', 'recipe', 'brew', 'shot', 'glossary', 'term', 'q', 'filterMethod', ...TAG_KEYS].forEach((key) => url.searchParams.delete(key));
   }
 
   function urlFor(screen, id, shot) {
@@ -370,6 +519,10 @@
     if (screen === 'method') url.searchParams.set('method', id);
     if (screen === 'recipe') url.searchParams.set('recipe', id);
     if (screen === 'brew') url.searchParams.set('brew', id);
+    if (screen === 'glossary') {
+      url.searchParams.set('glossary', '1');
+      if (state.glossaryQuery.trim()) url.searchParams.set('q', state.glossaryQuery.trim());
+    }
     if (shot) url.searchParams.set('shot', shot);
     return `${url.pathname}${url.search}${url.hash}`;
   }
@@ -379,6 +532,7 @@
     if (screen === 'recipe' || screen === 'brew') chooseRecipe(id);
     if (screen === 'library') renderLibrary();
     if (screen === 'brew') renderBrewShell();
+    if (screen === 'glossary') renderGlossary();
     const canonicalId = screen === 'method' ? state.method.id : state.recipe.id;
     history[replace ? 'replaceState' : 'pushState']({ screen, id: canonicalId }, '', urlFor(screen, canonicalId, shot));
     showScreen(screen, { focus, transition });
@@ -400,6 +554,24 @@
     const recipeId = params.get('recipe');
     const methodId = params.get('method');
     const shot = params.get('shot');
+    const termId = params.get('term');
+    const termRecord = termId ? getGlossaryTerm(termId) : null;
+    if (params.get('glossary') === '1') {
+      state.glossaryQuery = params.get('q') || '';
+      renderGlossary();
+      showScreen('glossary', { focus: focus && !termRecord, transition: 'none' });
+      if (termRecord) openTerm(termRecord.id, null);
+      return;
+    }
+    if (termRecord) {
+      // A direct link to one definition renders its owning screen underneath,
+      // so closing the panel leaves a real screen rather than a blank page.
+      state.glossaryQuery = '';
+      renderLibrary();
+      showScreen('library', { focus: false, transition: 'none' });
+      openTerm(termRecord.id, null);
+      return;
+    }
     if (brewId && isKnownRecipeReference(brewId)) {
       chooseRecipe(brewId);
       state.timer = freshTimer();
@@ -448,6 +620,9 @@
   }
 
   function renderBrewShell() {
+    state.lastActiveStepLabel = null;
+    state.lastNextStepLabel = null;
+    state.lastRenderedStep = null;
     state.lastAnnouncedStep = -1;
     state.lastPreparationAnnouncementStep = -1;
     state.lastPreparationHapticStep = -1;
@@ -477,7 +652,7 @@
     elements.nextStepPreview.dataset.state = timing.isImminent ? 'imminent' : timing.isPreparing ? 'preparing' : 'upcoming';
     elements.nextStepKicker.textContent = timing.isImminent ? 'Get ready' : timing.isPreparing ? 'Prepare' : 'Up next';
     elements.nextStepTiming.textContent = `in ${formatDuration(Math.ceil(timing.secondsUntilNext))} · starts at ${formatDuration(timing.nextStartsAt)}`;
-    elements.nextStepLabel.textContent = nextRecipeStep.label;
+    renderNextStepLabel(nextRecipeStep.label);
     elements.nextStepPreparation.textContent = nextRecipeStep.preparation;
     elements.nextStepTargetWrap.hidden = false;
     elements.nextStepTarget.textContent = `${nextRecipeStep.target}g`;
@@ -509,11 +684,20 @@
     elements.timerClock.textContent = formatDuration(Math.floor(elapsed));
     elements.timerStepKicker.textContent = state.timer.running ? 'Brewing' : state.timer.started ? 'Paused' : 'Ready';
     elements.activeStepNumber.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}`;
-    elements.activeStepLabel.textContent = recipeStep.label;
+    renderActiveStepLabel(recipeStep.label);
     elements.activeWaterTarget.textContent = recipeStep.target ? `${recipeStep.target}g` : 'Prep';
     elements.activeStepInstruction.textContent = recipeStep.instruction;
     elements.previousStep.disabled = stepIndex === 0 && elapsed <= 0;
     renderNextStep(timing);
+    // The visible step block is no longer an aria-live region (it now holds the
+    // definition button), so announce step changes through the dedicated
+    // announcer that the upcoming-step preview already uses. This fires for
+    // the first step when the brew starts and on every later transition.
+    if ((state.timer.running || state.timer.started) && state.lastRenderedStep !== stepIndex) {
+      const target = recipeStep.target ? ` Water target ${recipeStep.target} grams.` : '';
+      elements.timerAnnouncement.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}. ${recipeStep.label}.${target}`;
+    }
+    state.lastRenderedStep = stepIndex;
     elements.stepProgress.querySelectorAll('[data-step-dot]').forEach((dot, index) => {
       dot.dataset.state = index < stepIndex ? 'done' : index === stepIndex ? 'active' : 'upcoming';
     });
@@ -546,6 +730,9 @@
       state.timer.anchorElapsed = state.timer.elapsed;
       state.timer.anchorTime = Date.now();
       state.timer.running = true;
+      // A first start should announce the step in progress; a resume should
+      // stay quiet, so only clear the marker on the not-started transition.
+      if (!state.timer.started) state.lastRenderedStep = null;
       state.timer.started = true;
     }
     renderTimer();
@@ -644,17 +831,55 @@
   elements.brewAgain.addEventListener('click', () => { resetTimer(); toggleTimer(); });
   elements.returnToRecipe.addEventListener('click', () => navigate('recipe', state.recipe.id, { transition: 'pop' }));
   elements.about.addEventListener('click', openAbout);
+  elements.glossary.addEventListener('click', openGlossary);
+  elements.glossarySearch.addEventListener('input', () => {
+    state.glossaryQuery = elements.glossarySearch.value;
+    renderGlossary();
+    history.replaceState({ screen: 'glossary' }, '', urlFor('glossary'));
+  });
+  elements.glossaryClearSearch.addEventListener('click', () => {
+    state.glossaryQuery = '';
+    renderGlossary();
+    history.replaceState({ screen: 'glossary' }, '', urlFor('glossary'));
+    elements.glossarySearch.focus({ preventScroll: true });
+  });
+
+  // One delegated handler covers every definition trigger, including the ones
+  // rendered later by the timer and the recipe detail view. Triggers drawn
+  // inside the panel open in place rather than stacking a second panel.
+  document.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-term]');
+    if (!trigger) return;
+    const insidePanel = elements.termPanel.contains(trigger);
+    openTerm(trigger.dataset.term, insidePanel ? null : trigger);
+  });
+  elements.termPanelClose.addEventListener('click', () => closeTerm());
+  elements.termPanelDone.addEventListener('click', () => {
+    closeTerm({ restoreFocus: false });
+    openGlossary();
+  });
+  elements.termPanelBackdrop.addEventListener('click', () => closeTerm());
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.term.open) {
+      event.preventDefault();
+      closeTerm();
+    }
+  });
   elements.home.addEventListener('click', () => {
     state.filters = {};
     navigate('library', null, { transition: 'pop' });
   });
   elements.back.addEventListener('click', () => {
-    if (state.screen === 'brew') navigate('recipe', state.recipe.id, { transition: 'pop' });
+    if (state.screen === 'glossary') navigate('library', null, { transition: 'pop' });
+    else if (state.screen === 'brew') navigate('recipe', state.recipe.id, { transition: 'pop' });
     else if (state.screen === 'recipe') navigate('method', state.recipe.methodId, { transition: 'pop' });
     else navigate('library', null, { transition: 'pop' });
   });
 
-  window.addEventListener('popstate', () => parseLocation({ focus: true }));
+  window.addEventListener('popstate', () => {
+    closeTerm({ restoreFocus: false });
+    parseLocation({ focus: true });
+  });
   window.addEventListener('pagehide', cancelTimerTick);
 
   populateFilters();

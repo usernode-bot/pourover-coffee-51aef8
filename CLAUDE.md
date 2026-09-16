@@ -72,6 +72,14 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
   action card. Preparation begins 15 seconds before the step unless that step
   sets a longer `prepareLeadSeconds` value; the final 10 seconds use the
   strongest visible cue.
+- Glossary copy lives in `public/glossary.js`, deliberately separate from
+  `public/recipes.js`. Terms are keyed by stable ids, and taxonomy values and
+  timer step labels map onto those ids rather than restating definitions.
+  `tests/glossary.test.js` asserts every taxonomy value and mapped step has a
+  definition and that the copy is complete.
+- Definitions open in a panel over the current screen, so the timer and form
+  state are never lost. The panel is reachable by keyboard, closes on Escape,
+  and leaves the screen behind it inert while open.
 - Preferred doses are non-sensitive device preferences and stay in
   `localStorage`, keyed by recipe id. Read the previous method-level key as a
   migration fallback before using the recipe's base dose. The MVP has no
