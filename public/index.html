@@ -104,7 +104,7 @@
               Better coffee,<br><span class="font-serif font-normal italic text-[#a34d31]">one pour at a time.</span>
             </h1>
             <p class="mt-5 max-w-lg text-[15px] leading-6 text-[#6f5d50] sm:text-base">
-              Pick a brewer, set your dose, and follow a calm step-by-step timer. Every recipe is a starting point for your own cup.
+              Pick a brewer or start with the cup you want. Fifteen original recipes give you room to explore before the guided timer takes over.
             </p>
           </div>
           <div class="hero-art" aria-hidden="true">
@@ -117,13 +117,46 @@
 
         <div class="mt-8 flex items-end justify-between gap-4 px-1">
           <div>
-            <p class="eyebrow">Recipe shelf</p>
+            <p class="eyebrow">Brewer shelf</p>
             <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#2c211a]">What are you brewing?</h2>
           </div>
-          <p class="hidden max-w-xs text-right text-xs leading-5 text-[#8c7868] sm:block">Five dependable starting points.<br>Adjust from 5g to 60g.</p>
+          <p class="hidden max-w-xs text-right text-xs leading-5 text-[#8c7868] sm:block">Five methods, three recipes each.<br>Adjust every recipe from 5g to 60g.</p>
         </div>
 
-        <div id="recipe-list" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Brewing methods"></div>
+        <div id="method-list" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Brewing methods"></div>
+
+        <section id="recipe-discovery" class="discovery-panel mt-10 rounded-[2rem] p-4 sm:p-6" aria-labelledby="discover-title">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p class="eyebrow">Recipe library</p>
+              <h2 id="discover-title" class="mt-1 text-2xl font-semibold tracking-tight">Find your next cup</h2>
+              <p class="mt-2 max-w-2xl text-sm leading-6 text-[#756456]">Filter by brewer, coffee, technique, or the result you want. Every recipe is a Pourover Coffee original.</p>
+            </div>
+            <p id="recipe-result-count" class="shrink-0 text-sm font-semibold text-[#6d5849]" aria-live="polite">15 recipes</p>
+          </div>
+
+          <form id="recipe-filters" class="filter-grid mt-5" aria-label="Filter recipes">
+            <label class="filter-field"><span>Method</span><select name="method"></select></label>
+            <label class="filter-field"><span>Roast</span><select name="roast"></select></label>
+            <label class="filter-field"><span>Cup profile</span><select name="profile"></select></label>
+            <label class="filter-field"><span>Technique</span><select name="technique"></select></label>
+            <label class="filter-field"><span>Experience</span><select name="experience"></select></label>
+            <label class="filter-field"><span>Serving</span><select name="serving"></select></label>
+          </form>
+
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <div id="active-filters" class="flex flex-wrap gap-2" aria-label="Active filters" hidden></div>
+            <button id="clear-filters" class="clear-filter-button" type="button" hidden>Clear all</button>
+          </div>
+
+          <div id="recipe-list" class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Recipes"></div>
+          <div id="recipe-empty-state" class="empty-state mt-5" hidden>
+            <span aria-hidden="true">☕</span>
+            <h3>No recipes match yet</h3>
+            <p>Try removing one filter to broaden the shelf.</p>
+            <button id="empty-clear-filters" class="outline-button" type="button">Clear filters</button>
+          </div>
+        </section>
 
         <aside class="mt-8 rounded-3xl border border-[#d9cdbc] bg-white/45 p-5 sm:flex sm:items-center sm:justify-between sm:gap-8">
           <div class="flex items-start gap-3">
@@ -137,12 +170,33 @@
         </aside>
       </section>
 
+      <section id="method-screen" class="screen" data-screen="method" data-active="false" aria-labelledby="method-title" hidden>
+        <div id="method-hero" class="recipe-hero rounded-[2rem] p-5 sm:p-8">
+          <div class="relative z-10 max-w-2xl">
+            <p id="method-character" class="eyebrow"></p>
+            <h1 id="method-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl"></h1>
+            <p id="method-description" class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base"></p>
+          </div>
+          <div id="method-art" class="recipe-hero-art" aria-hidden="true"></div>
+        </div>
+
+        <div class="mt-6 flex flex-col gap-3 px-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="eyebrow">Choose your approach</p>
+            <h2 id="method-recipe-count" class="mt-1 text-2xl font-semibold tracking-tight"></h2>
+          </div>
+          <button id="method-browse-all" class="outline-button justify-center" type="button"></button>
+        </div>
+        <div id="method-recipe-list" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Recipes for this method"></div>
+      </section>
+
       <section id="recipe-screen" class="screen" data-screen="recipe" data-active="false" aria-labelledby="recipe-title" hidden>
         <div id="recipe-hero" class="recipe-hero rounded-[2rem] p-5 sm:p-8">
           <div class="relative z-10 max-w-2xl">
             <p id="recipe-character" class="eyebrow"></p>
             <h1 id="recipe-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl"></h1>
             <p id="recipe-description" class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base"></p>
+            <p id="recipe-attribution" class="source-badge mt-4"></p>
           </div>
           <div id="recipe-art" class="recipe-hero-art" aria-hidden="true"></div>
         </div>
@@ -181,8 +235,16 @@
                 <div class="detail-row"><dt>Water</dt><dd id="recipe-temperature"></dd></div>
                 <div class="detail-row"><dt>Grind</dt><dd id="recipe-grind"></dd></div>
                 <div class="detail-row"><dt>Time</dt><dd id="recipe-duration"></dd></div>
+                <div class="detail-row"><dt>Difficulty</dt><dd id="recipe-difficulty"></dd></div>
               </dl>
               <p id="recipe-equipment" class="mt-4 rounded-2xl bg-[#f1e9df] px-4 py-3 text-xs leading-5 text-[#756354]"></p>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="profile-heading">
+              <p class="eyebrow">In the cup</p>
+              <h2 id="profile-heading" class="mt-1 text-xl font-semibold tracking-tight">What to expect</h2>
+              <p id="recipe-result" class="mt-2 text-sm leading-6 text-[#725f50]"></p>
+              <dl id="recipe-tag-groups" class="recipe-tag-groups mt-4"></dl>
             </section>
           </div>
 
@@ -209,6 +271,7 @@
             <div>
               <p id="brew-method" class="eyebrow"></p>
               <h1 id="brew-title" tabindex="-1" class="mt-1 text-2xl font-semibold tracking-tight">Guided brew</h1>
+              <p class="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-[#9a8473]">Guided brew</p>
             </div>
             <div class="text-right">
               <p id="brew-dose" class="text-sm font-semibold"></p>
@@ -293,7 +356,7 @@
     <div class="about-card p-6 text-[#2c211a]">
       <p class="eyebrow">About the recipes</p>
       <h2 class="mt-2 text-2xl font-semibold tracking-tight">A dependable place to begin</h2>
-      <p class="mt-3 text-sm leading-6 text-[#725f50]">Coffee changes with the bean, water, grinder, and room. These recipes give you a clear baseline. Taste the result, then adjust one variable at a time.</p>
+      <p class="mt-3 text-sm leading-6 text-[#725f50]">Coffee changes with the bean, water, grinder, and room. The fifteen original recipes give you distinct starting points for different coffees and cup profiles.</p>
       <p class="mt-3 text-sm leading-6 text-[#725f50]">All water targets scale with your coffee dose. Your preferred dose stays on this device.</p>
       <button class="primary-button mt-6 w-full justify-center" type="button" data-close-about>Got it</button>
     </div>

@@ -24,13 +24,31 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.icon.emoji, '☕');
   assert.deepEqual(manifest.tests.map((entry) => entry.path), [
     '/',
-    '/?recipe=v60',
-    '/?brew=v60&shot=active',
+    '/?method=v60',
+    '/?filterMethod=v60&roast=light&profile=sweet',
+    '/?recipe=v60-bright',
+    '/?brew=v60-bright&shot=active',
   ]);
-  assert.equal(manifest.tests[2].visual, true);
-  assert.equal(manifest.tests[2].id, 'brew.guided-timer');
-  assert.equal(manifest.tests[1].expectText, 'Scale the recipe');
-  assert.equal(manifest.tests[2].expectText, 'Get ready');
+  assert.equal(manifest.tests[4].visual, true);
+  assert.equal(manifest.tests[4].id, 'brew.guided-timer');
+  assert.equal(manifest.tests[1].expectText, '3 recipes for V60');
+  assert.equal(manifest.tests[2].expectText, 'Sweet pulse');
+  assert.equal(manifest.tests[3].expectText, 'Pourover Coffee original');
+  assert.equal(manifest.tests[4].expectText, 'Get ready');
+});
+
+test('the shell has separate method, discovery, detail, and brew surfaces', () => {
+  const html = read('public/index.html');
+  assert.match(html, /id="method-list"/);
+  assert.match(html, /id="recipe-filters"/);
+  assert.match(html, /select name="method"/);
+  assert.match(html, /select name="roast"/);
+  assert.match(html, /select name="profile"/);
+  assert.match(html, /id="active-filters"/);
+  assert.match(html, /id="recipe-empty-state"/);
+  assert.match(html, /id="method-screen"/);
+  assert.match(html, /id="method-recipe-list"/);
+  assert.match(html, /id="recipe-tag-groups"/);
 });
 
 test('the guided timer includes an accessible non-ticking upcoming-step preview', () => {
