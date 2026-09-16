@@ -29,6 +29,10 @@ html {
   background: var(--paper);
 }
 
+body.term-open {
+  overflow: hidden;
+}
+
 body {
   min-height: 100%;
   margin: 0;
@@ -977,6 +981,260 @@ textarea:focus-visible,
   max-width: 28rem;
 }
 
+/* Glossary ------------------------------------------------------------- */
+
+.glossary-hero {
+  position: relative;
+  border: 1px solid rgba(122, 85, 56, 0.13);
+  background: linear-gradient(112deg, rgba(255, 252, 246, 0.98) 0%, rgba(236, 231, 214, 0.86) 100%);
+  box-shadow: 0 20px 55px rgba(81, 56, 37, 0.09);
+}
+
+.glossary-search input {
+  width: 100%;
+  max-width: 22rem;
+  min-height: 3rem;
+  border: 1px solid #d8cabc;
+  border-radius: 999px;
+  padding: 0.7rem 1.1rem;
+  background: #fffaf3;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.glossary-search input:focus-visible {
+  outline: 2px solid var(--recipe-accent, #a84f32);
+  outline-offset: 2px;
+}
+
+.glossary-group {
+  grid-column: 1 / -1;
+}
+
+.glossary-group-heading {
+  margin-bottom: 0.6rem;
+  padding-left: 0.15rem;
+  color: #967b67;
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.glossary-group-cards {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.glossary-group-cards .glossary-card + .glossary-card {
+  margin-top: 0;
+}
+
+.glossary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border: 1px solid rgba(95, 70, 51, 0.13);
+  border-radius: 1.4rem;
+  padding: 1.1rem 1.15rem;
+  background: rgba(255, 252, 246, 0.8);
+  box-shadow: 0 14px 34px rgba(68, 46, 31, 0.06);
+  text-align: left;
+}
+
+.glossary-card-category {
+  color: #967b67;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.glossary-card-term {
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.glossary-card-summary {
+  color: #725f50;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.term-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.28rem;
+  min-height: 1.9rem;
+  border: 0;
+  border-radius: 0.5rem;
+  padding: 0.15rem 0.3rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22rem;
+}
+
+.term-link:hover,
+.term-link:focus-visible {
+  background: color-mix(in srgb, var(--recipe-accent, #a84f32), transparent 90%);
+}
+
+.term-link-mark,
+.term-mark {
+  flex: 0 0 auto;
+  color: #a2907e;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.term-mark {
+  display: inline-grid;
+  width: 1.05rem;
+  height: 1.05rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--recipe-accent, #a84f32), white 52%);
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in srgb, var(--recipe-accent, #a84f32), #2d2119 25%);
+}
+
+.term-mark:focus-visible {
+  outline: 2px solid var(--recipe-accent, #a84f32);
+  outline-offset: 2px;
+}
+
+.term-link:focus-visible {
+  outline: 2px solid var(--recipe-accent, #a84f32);
+  outline-offset: 2px;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.detail-row dt .term-link,
+.detail-row dd .term-link,
+.recipe-step-label .term-link {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.term-panel[hidden] {
+  display: none;
+}
+
+.term-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.term-panel-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(34, 24, 18, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.term-panel-card {
+  position: relative;
+  z-index: 1;
+  width: min(34rem, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  border: 1px solid rgba(95, 70, 51, 0.15);
+  border-radius: 1.6rem 1.6rem 0 0;
+  padding: 1.25rem 1.35rem calc(1.5rem + var(--un-safe-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  background: #fbf7f0;
+  box-shadow: 0 -18px 60px rgba(38, 24, 16, 0.28);
+}
+
+.term-panel-handle {
+  width: 2.6rem;
+  height: 0.28rem;
+  margin: 0 auto 1rem;
+  border-radius: 999px;
+  background: #d9cbba;
+}
+
+.term-panel-category {
+  margin: 0;
+}
+
+.term-panel-summary {
+  margin-top: 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.term-panel-detail {
+  margin-top: 0.75rem;
+  color: #725f50;
+  font-size: 0.88rem;
+  line-height: 1.62;
+}
+
+.term-panel-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 1.35rem;
+}
+
+.term-panel-related-label {
+  flex: 1 0 100%;
+  color: #967b67;
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.term-chip {
+  min-height: 2.35rem;
+  border: 1px solid color-mix(in srgb, var(--recipe-accent, #a84f32), white 66%);
+  border-radius: 999px;
+  padding: 0.45rem 0.8rem;
+  background: color-mix(in srgb, var(--recipe-accent, #a84f32), white 92%);
+  color: color-mix(in srgb, var(--recipe-accent, #a84f32), #2d2119 25%);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+@media (min-width: 640px) {
+  .glossary-group-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .term-panel {
+    align-items: center;
+  }
+
+  .term-panel-card {
+    border-radius: 1.6rem;
+    padding: 1.5rem 1.6rem;
+  }
+
+  .term-panel-handle {
+    display: none;
+  }
+}
+
 .about-dialog {
   width: min(28rem, calc(100vw - 2rem));
   padding: 0;
@@ -1344,6 +1602,10 @@ textarea:focus-visible,
 
 @media (min-width: 1024px) {
   .filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .glossary-group-cards {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

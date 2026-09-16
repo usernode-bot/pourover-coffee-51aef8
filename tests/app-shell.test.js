@@ -31,6 +31,9 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?journal=demo',
     '/?journal=demo&entry=demo-v60',
     '/?journal=new',
+    '/?glossary=1',
+    '/?glossary=1&q=drawdown',
+    '/?glossary=1&term=bloom',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'brew.guided-timer');
@@ -41,7 +44,10 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[5].expectText, 'Staging demo: Finca El Jardín');
   assert.equal(manifest.tests[6].expectText, 'Brew snapshot');
   assert.equal(manifest.tests[7].expectText, 'What did you use?');
-  assert.ok(manifest.tests.slice(5).every((entry) => entry.visual));
+  assert.ok(manifest.tests.slice(5, 8).every((entry) => entry.visual));
+  assert.equal(manifest.tests[10].visual, true);
+  assert.equal(manifest.tests[10].id, 'glossary.term-panel');
+  assert.match(manifest.tests[10].expectText, /gas escape/);
 });
 
 test('the shell has separate method, discovery, detail, and brew surfaces', () => {
@@ -99,8 +105,35 @@ test('recipe navigation retains exact historical revision links', () => {
   assert.match(source, /The current recipe is v/);
 });
 
+test('the glossary is reachable in context and covered by content checks', () => {
+  const html = read('public/index.html');
+  const source = read('public/app.js');
+
+  assert.match(html, /id="glossary-screen"/);
+  assert.match(html, /id="glossary-search"/);
+  assert.match(html, /src="\/glossary\.js"/);
+  assert.match(html, /id="term-panel"[^>]+role="dialog"/);
+  assert.match(html, /id="term-panel-backdrop"/);
+  assert.match(source, /aria-label="Definition of \$\{escapeHtml\(label\)\}"/);
+  assert.match(source, /event\.key === 'Escape' && state\.term\.open/);
+  assert.match(source, /window\.addEventListener\('popstate'/);
+  assert.match(source, /document\.getElementById\('app-shell'\)\.inert = true/);
+});
+
+test('the timer keeps its step label button alive across ticks', () => {
+  const source = read('public/app.js');
+
+  // The timer re-renders every 200ms. Replacing the step label each tick would
+  // destroy the definition button and drop keyboard focus with it.
+  assert.match(source, /function setStepLabel\(el, label, cacheKey\) \{\n    if \(state\[cacheKey\] === label\) return;/);
+  assert.match(source, /renderActiveStepLabel\(recipeStep\.label\)/);
+  assert.match(source, /renderNextStepLabel\(nextRecipeStep\.label\)/);
+  // Starting a brew announces the first step; resuming from a pause does not.
+  assert.match(source, /if \(!state\.timer\.started\) state\.lastRenderedStep = null;/);
+});
+
 test('user-facing product files contain no em dash encoding', () => {
-  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'server.js', 'journal-store.js', 'dapp.json']) {
+  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'server.js', 'journal-store.js', 'dapp.json']) {
     const source = read(file);
     assert.doesNotMatch(source, /—|&mdash;|&#8212;|\\u2014/, file);
   }

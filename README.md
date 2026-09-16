@@ -15,6 +15,11 @@ brewing.
 - Filters the recipe library by method, roast, cup profile, technique,
   experience, and serving size. Filters combine across facets and remain in
   the URL so a result set can be shared or checked directly.
+- Explains brewing terms in context: every filter label, recipe tag, detail
+  row, and specialized timer step opens a plain-language definition without
+  losing timer or form state.
+- Provides a searchable glossary grouped by category, plus a direct link to
+  any single definition.
 - Guides a brew with a timestamp-based timer that stays accurate after the
   page has been in the background.
 - Keeps the next action visible with its scheduled time, countdown, scaled
@@ -61,9 +66,13 @@ boot-time schema is idempotent and the journal table is marked
 - `public/recipes.js`: method metadata, append-only recipe revisions, immutable
   snapshot creation, tag taxonomy, filtering, legacy-link resolution, and
   dose-scaling logic.
+- `public/glossary.js`: glossary copy, category grouping, search, and the
+  mappings from taxonomy values and timer steps to terms.
 - `public/app.js`: navigation, rendering, local preferences, timer, and journal
   interactions.
 - `journal-store.js`: validated and user-scoped PostgreSQL journal storage.
 - `server.js`: Homeroom authentication, journal API, static serving, deep
   links, and graceful shutdown.
+- `tests/glossary.test.js`: content-integrity checks for glossary copy,
+  taxonomy coverage, and step mappings.
 - `dapp.json`: the app icon and proposal checks.
