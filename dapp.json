@@ -27,5 +27,9 @@
         "dapp.json"
       ]
     }
-  ]
+  ],
+  "visibility": {
+    "build": "private",
+    "view": "public"
+  }
 }
