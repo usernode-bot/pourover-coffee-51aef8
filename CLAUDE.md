@@ -30,25 +30,13 @@ for the whole story, including what to do if you are still being prompted
 (usually: your connector is registered under a different name than the rules
 assume).
 
-## Starter template
+## Product shell
 
-The screen this app currently ships — the hero, the "What's already
-working" card, and the Press! example (the demo markup in
-`public/index.html`, the `/api/press` and `/api/leaderboard` routes, and
-the `presses` table bootstrap in `server.js`) — is placeholder content
-from the Homeroom starter template, not product intent.
-
-When the user asks for their first real feature, REPLACE the template
-screen rather than building alongside it:
-
-- remove the `usernode-starter-notice@1` block in `public/index.html`
-  (both sentinel comments and everything between them),
-- remove or repurpose the "Try the example" card, its demo endpoints and
-  the `presses` table as appropriate,
-- rewrite `README.md` to describe the actual app.
-
-Keep the `usernode-dev-console@1` forwarder `<script>` when rewriting the
-HTML — that block is platform infrastructure, not template content.
+The starter template has been replaced by the product experience. Keep the
+`usernode-dev-console@1` forwarder `<script>` unchanged when editing the
+HTML because that block is platform infrastructure. The shell also loads the
+centrally hosted bridge and native UI kit from relative `/usernode-*` paths;
+never vendor those files.
 
 If a rule below this line conflicts with the hosted conventions, the
 hosted conventions win. This file is **app-specific** — write down
@@ -60,11 +48,18 @@ tables you've marked private), etc.
 
 ## About Pourover Coffee
 
-_(add a sentence or two of product context here so Claude Code has a
-shared understanding of what this app is for)_
+Pourover Coffee is a mobile-first recipe and timer companion for manual
+coffee brewing. It ships a small, opinionated library of starting recipes
+for V60, Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
 
 ## App-specific conventions
 
-_(optional — e.g. "all currency values stored as integer cents, not
-floats"; "the `posts` table is append-only"; "avoid adding new
-dependencies"; etc.)_
+- Recipe water is derived from the selected coffee dose and recipe ratio,
+  rounded to the nearest gram. Every cumulative step target scales by the
+  same proportion, and the final target must equal total water.
+- Recipe definitions and scaling logic live in `public/recipes.js` so the
+  browser and Node unit tests exercise the same source.
+- Preferred doses are non-sensitive device preferences and stay in
+  `localStorage`. The MVP has no server-side user data and needs no database.
+- Keep the experience calm and practical. Add one brewing variable at a
+  time, and frame every recipe as a starting point rather than a rule.

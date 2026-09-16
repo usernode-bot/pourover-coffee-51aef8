@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="bg-[#f4efe6]">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f4efe6">
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -27,7 +28,7 @@
             seen.add(val);
           }
           if (typeof val === 'function') return '[Function ' + (val.name || 'anonymous') + ']';
-          if (val instanceof Error) return val.stack || (val.name + ': ' + val.message);
+          if (val instanceof Error) return val.stack || val.message;
           return val;
         });
       } catch (e) { try { return String(v); } catch (_) { return '[unserializable]'; } }
@@ -63,119 +64,225 @@
     try { post('info', ['[dev-console ready]'], { kind: 'ready' }); } catch (_) {}
   })();
   </script>
+
   <title>Pourover Coffee</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%237c3aed'/><circle cx='50' cy='50' r='18' fill='white'/></svg>">
-  <!-- Tailwind, PRECOMPILED for this app (was cdn.tailwindcss.com's
-       in-browser engine plus an inline tailwind.config here). The config
-       moved to tailwind.config.js in the repo root; npm run build compiles
-       it to public/tailwind.css with Docker or Paketo on every image build, so the
-       stylesheet is regenerated from THIS commit's markup every deploy and
-       can never drift behind the code. ~7 KB of CSS instead of a ~400 KB
-       engine, and no flash of unstyled content.
-       Writing class names as whole literals is what keeps this working — a
-       class assembled from fragments at runtime (e.g. "bg-" + tone + "-500")
-       is invisible to the compiler. If you genuinely need runtime-generated
-       classes, swap this link for the platform-hosted engine instead:
-       <script src="https://my.onhomeroom.com/usernode-tailwind/v1/tailwind.js"></script> -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23f0e5d3'/><text x='50' y='68' font-size='58' text-anchor='middle'>☕</text></svg>">
+  <link rel="stylesheet" href="/usernode-native/v1/native.css">
   <link rel="stylesheet" href="/tailwind.css">
+  <link rel="stylesheet" href="/app.css">
+  <script src="/usernode-bridge/v1/bridge.js" defer></script>
+  <script src="/usernode-native/v1/native.js" defer></script>
+  <script src="/recipes.js" defer></script>
+  <script src="/app.js" defer></script>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen">
-  <main class="max-w-md mx-auto px-4 py-10 flex flex-col gap-6">
+<body class="min-h-screen text-[#2c211a] antialiased">
+  <div id="app-shell" class="min-h-screen">
+    <header id="app-header" class="app-header un-safe-top">
+      <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+        <button id="back-button" class="icon-button un-touch-target" type="button" aria-label="Go back" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button id="home-button" class="brand-lockup text-left" type="button" aria-label="Pourover Coffee home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 42 42"><path d="M11 14h20l-4 13a6 6 0 0 1-6 4h0a6 6 0 0 1-6-4l-4-13Z"/><path d="M9 11h24M17 7h8M28 18h2.5a4.5 4.5 0 0 1 0 9H27"/></svg>
+          </span>
+          <span>
+            <span class="block text-[10px] font-semibold uppercase tracking-[0.24em] text-[#947c69]">Daily ritual</span>
+            <span class="block text-sm font-semibold tracking-tight text-[#2c211a]">Pourover Coffee</span>
+          </span>
+        </button>
+        <button id="about-button" class="text-button un-touch-target" type="button">About</button>
+      </div>
+    </header>
 
-    <!-- usernode-starter-notice@1 — starter-template messaging. When building
-         the user's real app, replace this whole screen and delete this block,
-         both sentinel comments included. -->
-    <section class="rounded-2xl border border-violet-500/30 bg-gradient-to-b from-violet-600/20 to-transparent p-6 text-center flex flex-col items-center gap-3">
-      <span class="inline-block rounded-full bg-violet-600/20 text-violet-300 text-xs font-semibold uppercase tracking-wide px-3 py-1">Starter template</span>
-      <h1 class="text-2xl font-bold">Pourover Coffee</h1>
-      <p class="text-sm text-zinc-300 leading-relaxed">Welcome to your new app! Everything on this screen is placeholder content that came with it.</p>
-      <p class="text-sm text-zinc-300 leading-relaxed">Tap <strong class="text-violet-300 font-semibold">Improve</strong> in the header, describe what you'd like in plain English, and it will be turned into your real app.</p>
-    </section>
-
-    <section>
-      <h2 class="text-sm font-medium text-zinc-500 mb-2 px-1">What's already working</h2>
-      <div class="rounded-xl border border-zinc-800 bg-zinc-900/60 divide-y divide-zinc-800">
-        <div class="flex items-start gap-3 p-4">
-          <svg class="w-5 h-5 text-violet-400 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-sm font-semibold text-zinc-100">Sign-in</p>
-            <p class="text-sm text-zinc-400">You're signed in through Homeroom automatically — no accounts to build.</p>
+    <main id="app-main" class="mx-auto w-full max-w-6xl px-4 pb-20 pt-5 sm:px-6 sm:pt-8">
+      <section id="library-screen" class="screen" data-screen="library" data-active="true" aria-labelledby="library-title">
+        <div class="hero-panel overflow-hidden rounded-[2rem] px-5 py-7 sm:px-10 sm:py-10">
+          <div class="relative z-10 max-w-2xl">
+            <p class="eyebrow">Choose a method</p>
+            <h1 id="library-title" tabindex="-1" class="mt-3 max-w-xl text-[2.65rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#2b211b] sm:text-6xl">
+              Better coffee,<br><span class="font-serif font-normal italic text-[#a34d31]">one pour at a time.</span>
+            </h1>
+            <p class="mt-5 max-w-lg text-[15px] leading-6 text-[#6f5d50] sm:text-base">
+              Pick a brewer, set your dose, and follow a calm step-by-step timer. Every recipe is a starting point for your own cup.
+            </p>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <span class="steam steam-one"></span>
+            <span class="steam steam-two"></span>
+            <span class="hero-dripper"></span>
+            <span class="hero-cup"></span>
           </div>
         </div>
-        <div class="flex items-start gap-3 p-4">
-          <svg class="w-5 h-5 text-violet-400 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
+
+        <div class="mt-8 flex items-end justify-between gap-4 px-1">
           <div>
-            <p class="text-sm font-semibold text-zinc-100">Database</p>
-            <p class="text-sm text-zinc-400">Your app has its own private database, ready to store things.</p>
+            <p class="eyebrow">Recipe shelf</p>
+            <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#2c211a]">What are you brewing?</h2>
+          </div>
+          <p class="hidden max-w-xs text-right text-xs leading-5 text-[#8c7868] sm:block">Five dependable starting points.<br>Adjust from 5g to 60g.</p>
+        </div>
+
+        <div id="recipe-list" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Brewing methods"></div>
+
+        <aside class="mt-8 rounded-3xl border border-[#d9cdbc] bg-white/45 p-5 sm:flex sm:items-center sm:justify-between sm:gap-8">
+          <div class="flex items-start gap-3">
+            <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e8ded0] text-lg" aria-hidden="true">✦</span>
+            <div>
+              <h2 class="text-sm font-semibold">Taste, then tune</h2>
+              <p class="mt-1 text-sm leading-6 text-[#756456]">If the cup tastes sharp, grind a little finer. If it tastes dry or bitter, grind a little coarser.</p>
+            </div>
+          </div>
+          <p class="mt-4 shrink-0 text-xs font-medium uppercase tracking-[0.16em] text-[#9b826e] sm:mt-0">Water matters too</p>
+        </aside>
+      </section>
+
+      <section id="recipe-screen" class="screen" data-screen="recipe" data-active="false" aria-labelledby="recipe-title" hidden>
+        <div id="recipe-hero" class="recipe-hero rounded-[2rem] p-5 sm:p-8">
+          <div class="relative z-10 max-w-2xl">
+            <p id="recipe-character" class="eyebrow"></p>
+            <h1 id="recipe-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl"></h1>
+            <p id="recipe-description" class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base"></p>
+          </div>
+          <div id="recipe-art" class="recipe-hero-art" aria-hidden="true"></div>
+        </div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-[0.86fr_1.14fr]">
+          <div class="space-y-4">
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="dose-heading">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="eyebrow">Scale the recipe</p>
+                  <h2 id="dose-heading" class="mt-1 text-xl font-semibold tracking-tight">Coffee dose</h2>
+                </div>
+                <div class="text-right">
+                  <p class="text-xs font-medium uppercase tracking-[0.14em] text-[#9a8473]">Water</p>
+                  <p class="mt-0.5 text-2xl font-semibold tracking-tight"><span id="water-total">250</span><span class="ml-0.5 text-sm font-medium text-[#8a7565]">g</span></p>
+                </div>
+              </div>
+
+              <div class="dose-control mt-5">
+                <button id="dose-minus" class="dose-button un-touch-target" type="button" aria-label="Use one gram less coffee">−</button>
+                <label class="dose-value">
+                  <span class="sr-only">Coffee dose in grams</span>
+                  <input id="coffee-dose" type="number" min="5" max="60" step="1" inputmode="numeric" value="15">
+                  <span aria-hidden="true">g</span>
+                </label>
+                <button id="dose-plus" class="dose-button un-touch-target" type="button" aria-label="Use one gram more coffee">+</button>
+              </div>
+              <p class="mt-3 text-center text-xs text-[#907b6b]">Water updates with the recipe ratio.</p>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="details-heading">
+              <p class="eyebrow">At a glance</p>
+              <h2 id="details-heading" class="sr-only">Recipe details</h2>
+              <dl class="mt-3 divide-y divide-[#e6ddd1]">
+                <div class="detail-row"><dt>Ratio</dt><dd id="recipe-ratio"></dd></div>
+                <div class="detail-row"><dt>Water</dt><dd id="recipe-temperature"></dd></div>
+                <div class="detail-row"><dt>Grind</dt><dd id="recipe-grind"></dd></div>
+                <div class="detail-row"><dt>Time</dt><dd id="recipe-duration"></dd></div>
+              </dl>
+              <p id="recipe-equipment" class="mt-4 rounded-2xl bg-[#f1e9df] px-4 py-3 text-xs leading-5 text-[#756354]"></p>
+            </section>
+          </div>
+
+          <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="steps-heading">
+            <div class="flex items-baseline justify-between gap-3">
+              <div>
+                <p class="eyebrow">The pour</p>
+                <h2 id="steps-heading" class="mt-1 text-xl font-semibold tracking-tight">Step by step</h2>
+              </div>
+              <span id="step-count" class="text-xs font-medium text-[#907b6b]"></span>
+            </div>
+            <ol id="recipe-steps" class="mt-5 space-y-1"></ol>
+            <button id="start-brew-button" class="primary-button mt-6 w-full" type="button">
+              <span>Start guided brew</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </section>
+        </div>
+      </section>
+
+      <section id="brew-screen" class="screen" data-screen="brew" data-active="false" aria-labelledby="brew-title" hidden>
+        <div class="mx-auto max-w-3xl">
+          <div class="flex items-start justify-between gap-4 px-1">
+            <div>
+              <p id="brew-method" class="eyebrow"></p>
+              <h1 id="brew-title" tabindex="-1" class="mt-1 text-2xl font-semibold tracking-tight">Guided brew</h1>
+            </div>
+            <div class="text-right">
+              <p id="brew-dose" class="text-sm font-semibold"></p>
+              <p id="brew-ratio" class="text-xs text-[#8c7767]"></p>
+            </div>
+          </div>
+
+          <div id="timer-panel" class="timer-panel mt-4 rounded-[2rem] px-5 pb-6 pt-7 sm:px-8 sm:pb-8">
+            <div id="timer-ring" class="timer-ring mx-auto" style="--progress: 0deg">
+              <div class="timer-ring-inner">
+                <p id="timer-step-kicker" class="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#9c826e]">Ready</p>
+                <p id="timer-clock" class="mt-1 tabular-nums">0:00</p>
+                <p id="timer-total" class="mt-1 text-xs text-[#9b8878]">of 3:00</p>
+              </div>
+            </div>
+
+            <div class="mt-6 text-center" aria-live="polite" aria-atomic="true">
+              <p id="active-step-number" class="eyebrow">Step 1 of 4</p>
+              <h2 id="active-step-label" class="mt-1 text-3xl font-semibold tracking-[-0.04em]">Bloom</h2>
+              <div class="mt-3 inline-flex items-baseline gap-1 rounded-full bg-[#2f241d] px-4 py-2 text-[#f8f1e8]">
+                <span class="text-xs font-medium uppercase tracking-[0.14em] text-[#cdb9a7]">Pour to</span>
+                <span id="active-water-target" class="text-xl font-semibold tabular-nums">45g</span>
+              </div>
+              <p id="active-step-instruction" class="mx-auto mt-4 max-w-md text-sm leading-6 text-[#725f50]"></p>
+            </div>
+
+            <div id="step-progress" class="mt-6 flex items-center justify-center gap-2" aria-label="Brew progress"></div>
+
+            <div class="mt-7 grid grid-cols-[3rem_1fr_3rem] items-center gap-3 sm:grid-cols-[3.5rem_1fr_3.5rem]">
+              <button id="previous-step" class="secondary-icon-button un-touch-target" type="button" aria-label="Previous step">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 7-5 5 5 5"/><path d="M19 5v14"/></svg>
+              </button>
+              <button id="timer-toggle" class="primary-button justify-center" type="button">
+                <svg id="timer-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 7 8 5-8 5V7Z"/></svg>
+                <span id="timer-toggle-label">Start timer</span>
+              </button>
+              <button id="next-step" class="secondary-icon-button un-touch-target" type="button" aria-label="Next step">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 7 5 5-5 5"/><path d="M5 5v14"/></svg>
+              </button>
+            </div>
+            <button id="reset-timer" class="mx-auto mt-5 block min-h-11 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#907a69]" type="button">Reset timer</button>
+          </div>
+
+          <div id="brew-complete" class="completion-panel mt-4 rounded-[2rem] p-7 text-center sm:p-10" hidden>
+            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#dce5d8] text-2xl" aria-hidden="true">✓</div>
+            <p class="eyebrow mt-5">Brew complete</p>
+            <h2 class="mt-1 text-3xl font-semibold tracking-[-0.04em]">Give it a gentle swirl.</h2>
+            <p class="mx-auto mt-3 max-w-md text-sm leading-6 text-[#725f50]">Let the cup cool for a moment, then taste. Keep what worked and adjust one thing next time.</p>
+            <div class="mt-6 grid gap-3 sm:grid-cols-2">
+              <button id="brew-again" class="primary-button justify-center" type="button">Brew again</button>
+              <button id="return-to-recipe" class="outline-button" type="button">Back to recipe</button>
+            </div>
           </div>
         </div>
-        <div class="flex items-start gap-3 p-4">
-          <svg class="w-5 h-5 text-violet-400 shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7 7a1 1 0 0 1-1.4 0l-3-3a1 1 0 1 1 1.4-1.4L9 11.6l6.3-6.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
-          <div>
-            <p class="text-sm font-semibold text-zinc-100">Live API</p>
-            <p class="text-sm text-zinc-400">The example below talks to a real server — try it.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-    <!-- /usernode-starter-notice@1 -->
+      </section>
+    </main>
 
-    <section class="rounded-xl border border-zinc-800 bg-zinc-900/60 p-5 flex flex-col items-center gap-5">
-      <div class="w-full flex items-baseline justify-between gap-2">
-        <h2 class="text-sm font-medium text-zinc-500">Try the example</h2>
-        <span class="text-xs text-zinc-600">This example will be replaced</span>
-      </div>
+    <footer class="un-safe-bottom px-4 pb-5 text-center text-[11px] font-medium uppercase tracking-[0.16em] text-[#a28c78]">
+      Brew slowly. Taste curiously.
+    </footer>
+  </div>
 
-      <button id="press-btn" class="w-32 h-32 rounded-full bg-violet-600 hover:bg-violet-500 active:scale-95 transition-all text-white text-xl font-bold shadow-lg shadow-violet-600/30">
-        Press!
-      </button>
+  <template id="about-content">
+    <div class="about-card p-6 text-[#2c211a]">
+      <p class="eyebrow">About the recipes</p>
+      <h2 class="mt-2 text-2xl font-semibold tracking-tight">A dependable place to begin</h2>
+      <p class="mt-3 text-sm leading-6 text-[#725f50]">Coffee changes with the bean, water, grinder, and room. These recipes give you a clear baseline. Taste the result, then adjust one variable at a time.</p>
+      <p class="mt-3 text-sm leading-6 text-[#725f50]">All water targets scale with your coffee dose. Your preferred dose stays on this device.</p>
+      <button class="primary-button mt-6 w-full justify-center" type="button" data-close-about>Got it</button>
+    </div>
+  </template>
 
-      <div id="count" class="text-lg text-zinc-400">0 total presses</div>
-
-      <div class="w-full max-w-sm">
-        <h3 class="text-sm font-medium text-zinc-500 mb-2 text-center">Leaderboard</h3>
-        <div id="leaderboard" class="space-y-1"></div>
-      </div>
-    </section>
-
-    <p class="text-center text-xs text-zinc-600">Built on Homeroom — this template screen disappears once you build your real app.</p>
-  </main>
-
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || '';
-    const headers = token ? { 'x-usernode-token': token } : {};
-
-    async function loadLeaderboard() {
-      const res = await fetch('/api/leaderboard', { headers });
-      if (!res.ok) return;
-      const { leaderboard } = await res.json();
-      const el = document.getElementById('leaderboard');
-      if (!leaderboard.length) {
-        el.innerHTML = '<p class="text-center text-zinc-600 text-sm">No presses yet</p>';
-        return;
-      }
-      el.innerHTML = leaderboard.map((r, i) =>
-        '<div class="flex justify-between px-3 py-1 rounded ' + (i === 0 ? 'bg-violet-600/20 text-violet-300' : 'text-zinc-400') + '">' +
-        '<span>' + (i + 1) + '. ' + r.username + '</span>' +
-        '<span class="font-mono">' + r.presses + '</span></div>'
-      ).join('');
-      const total = leaderboard.reduce((s, r) => s + parseInt(r.presses), 0);
-      document.getElementById('count').textContent = total + ' total presses';
-    }
-
-    document.getElementById('press-btn').addEventListener('click', async () => {
-      try {
-        const res = await fetch('/api/press', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-        });
-        if (res.ok) loadLeaderboard();
-        else if (res.status === 401) document.getElementById('count').textContent = 'Sign in to press!';
-      } catch {}
-    });
-
-    loadLeaderboard();
-  </script>
+  <noscript>
+    <div class="mx-auto max-w-md p-8 text-center text-sm">Pourover Coffee needs JavaScript to run the guided timer.</div>
+  </noscript>
 </body>
 </html>
