@@ -11,14 +11,24 @@
       "expectSelector": "#recipe-list [data-recipe-id]"
     },
     {
-      "name": "Recipe detail scales a brew",
-      "path": "/?recipe=v60",
-      "expectText": "Scale the recipe"
+      "name": "Method page compares its recipes",
+      "path": "/?method=v60",
+      "expectText": "3 recipes for V60"
+    },
+    {
+      "name": "Structured filters narrow the recipe library",
+      "path": "/?filterMethod=v60&roast=light&profile=sweet",
+      "expectText": "Sweet pulse"
+    },
+    {
+      "name": "Recipe detail includes attribution and scaling",
+      "path": "/?recipe=v60-bright",
+      "expectText": "Pourover Coffee original"
     },
     {
       "id": "brew.guided-timer",
       "name": "Guided timer renders an active brew",
-      "path": "/?brew=v60&shot=active",
+      "path": "/?brew=v60-bright&shot=active",
       "expectText": "Get ready",
       "visual": true,
       "impact": [

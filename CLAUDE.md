@@ -49,8 +49,8 @@ tables you've marked private), etc.
 ## About Pourover Coffee
 
 Pourover Coffee is a mobile-first recipe and timer companion for manual
-coffee brewing. It ships a small, opinionated library of starting recipes
-for V60, Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
+coffee brewing. It ships fifteen original recipes, three each for V60,
+Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
 
 ## App-specific conventions
 
@@ -59,11 +59,22 @@ for V60, Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
   same proportion, and the final target must equal total water.
 - Recipe definitions and scaling logic live in `public/recipes.js` so the
   browser and Node unit tests exercise the same source.
+- Methods and recipes are separate records. Method ids identify brewers;
+  stable recipe ids identify an exact set of dose, ratio, steps, and tags.
+  Legacy `?recipe=<method-id>` and `?brew=<method-id>` URLs resolve to that
+  method's declared default recipe.
+- Recipe discovery uses the typed `TAG_TAXONOMY` facets in
+  `public/recipes.js`: roast, profile, technique, experience, and serving.
+  `filterRecipes` applies AND semantics across selected facets. The library
+  stores those selections in query parameters, using `filterMethod` for the
+  method facet so it cannot conflict with the dedicated `method` page route.
 - Each recipe step includes short `preparation` copy for the timer's upcoming
   action card. Preparation begins 15 seconds before the step unless that step
   sets a longer `prepareLeadSeconds` value; the final 10 seconds use the
   strongest visible cue.
 - Preferred doses are non-sensitive device preferences and stay in
-  `localStorage`. The MVP has no server-side user data and needs no database.
+  `localStorage`, keyed by recipe id. Read the previous method-level key as a
+  migration fallback before using the recipe's base dose. The MVP has no
+  server-side user data and needs no database.
 - Keep the experience calm and practical. Add one brewing variable at a
   time, and frame every recipe as a starting point rather than a rule.
