@@ -272,6 +272,17 @@
         "server.js",
         "dapp.json"
       ]
+    },
+    {
+      "id": "offline.sync-status",
+      "name": "Offline sync status reports queued writes",
+      "path": "/?offline=shot",
+      "expectText": "Sync status",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {

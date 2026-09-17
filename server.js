@@ -301,6 +301,10 @@ app.get('/api/brews/:id', async (req, res) => {
 app.post('/api/brews', async (req, res) => {
   try {
     if (!requireJournal(res)) return undefined;
+    const key = replayKey(req);
+    if (replayResults.has(key)) {
+      return res.status(201).json(applyReplayHeaders(req, res, replayResults.get(key)));
+    }
     const input = journal.normalizeCreateInput(req.body);
     const recipe = await resolveRecipeForUser(req.user.id, `${input.recipeId}@${input.recipeVersion}`);
     if (!recipe || recipe.id !== input.recipeId) {
@@ -308,7 +312,9 @@ app.post('/api/brews', async (req, res) => {
     }
     const snapshot = createRecipeSnapshot(recipe, input.coffee);
     const entry = await journal.createEntry(pool, req.user, input, snapshot);
-    return res.status(201).json({ entry: (await entriesForClient(req.user.id, [entry]))[0] });
+    const payload = { entry: (await entriesForClient(req.user.id, [entry]))[0] };
+    if (req.headers['x-idempotency-key']) replayResults.set(key, payload);
+    return res.status(201).json(applyReplayHeaders(req, res, payload));
   } catch (error) {
     return sendJournalError(res, error);
   }
@@ -319,6 +325,14 @@ app.patch('/api/brews/:id', async (req, res) => {
     if (!requireJournal(res)) return undefined;
     const entryId = journal.parseEntryId(req.params.id);
     if (!entryId) return res.status(404).json({ error: 'Brew entry not found.' });
+    const existing = await journal.getEntry(pool, req.user.id, entryId);
+    const queuedAt = req.body?.baseUpdatedAt || req.headers['x-queued-at'];
+    if (existing && queuedAt && new Date(existing.updatedAt) > new Date(queuedAt)) {
+      return res.status(409).json({
+        error: 'This entry changed on the server after your edit was made.',
+        serverUpdatedAt: existing.updatedAt,
+      });
+    }
     const input = journal.normalizeUpdateInput(req.body);
     const entry = await journal.updateEntry(pool, req.user.id, entryId, input);
     return entry
@@ -397,6 +411,14 @@ app.post('/api/personal-recipes', async (req, res) => {
 app.patch('/api/personal-recipes/:recipeId', async (req, res) => {
   try {
     if (!requirePersonalRecipes(res)) return undefined;
+    const existing = await personalRecipes.getPersonalRecipe(pool, req.user.id, req.params.recipeId);
+    const queuedAt = req.body?.baseUpdatedAt || req.headers['x-queued-at'];
+    if (existing && queuedAt && new Date(existing.updatedAt) > new Date(queuedAt)) {
+      return res.status(409).json({
+        error: 'This recipe changed on the server after your edit was made.',
+        serverUpdatedAt: existing.updatedAt,
+      });
+    }
     const recipe = await personalRecipes.updatePersonalRecipe(
       pool, req.user.id, req.params.recipeId, req.body
     );
@@ -547,6 +569,34 @@ app.get('/api/shelf', async (req, res) => {
     });
   } catch (error) {
     return sendShelfError(res, error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Offline replay support.
+//
+// Queued client writes carry an idempotency key. A successful replay of the
+// same key returns the original result without doing the work twice, so a
+// retried sync can never duplicate a row.
+// ---------------------------------------------------------------------------
+
+const replayResults = new Map();
+
+function replayKey(req) {
+  return `${req.user.id}:${req.headers['x-idempotency-key'] || ''}`;
+}
+
+function applyReplayHeaders(req, res, payload) {
+  const key = req.headers['x-idempotency-key'];
+  if (key) res.set('x-idempotency-replayed', 'true');
+  return payload;
+}
+
+app.get('/api/sync', async (req, res) => {
+  try {
+    return res.json({ serverTime: new Date().toISOString() });
+  } catch (error) {
+    return res.status(500).json({ error: 'Sync status could not be read.' });
   }
 });
 

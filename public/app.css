@@ -2392,3 +2392,85 @@ textarea:focus-visible,
     justify-content: flex-end;
   }
 }
+
+
+/* Offline sync status */
+.offline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 8px 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid currentColor;
+}
+.offline-status[data-state='offline'] { color: #8a6d3b; background: #f7ecd8; }
+.offline-status[data-state='pending'] { color: #4c6b4f; background: #e4efe2; }
+.offline-status[data-state='failed'] { color: #8f3b2f; background: #f7e1dd; }
+.offline-status[data-state='conflict'] { color: #8f3b2f; background: #f7e1dd; }
+.offline-status-details {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.offline-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(44, 33, 26, 0.35);
+}
+.offline-panel-inner {
+  width: min(30rem, 100%);
+  background: #fffdf7;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 18px 50px rgba(44, 33, 26, 0.25);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.offline-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.offline-panel-head h2 { font-size: 1.05rem; font-weight: 700; }
+.offline-row {
+  border-radius: 12px;
+  border: 1px solid #eadfcd;
+  padding: 10px 12px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.offline-row[data-kind='offline'] { background: #f7ecd8; color: #6d5631; }
+.offline-row[data-kind='pending'] { background: #e4efe2; color: #3c5640; }
+.offline-row[data-kind='conflict'], .offline-row[data-kind='failed'] { background: #f7e1dd; color: #7c352a; }
+.offline-row-title { font-weight: 600; }
+.offline-row-error { font-size: 0.82rem; margin-top: 2px; }
+.offline-row-actions { display: flex; flex-direction: column; gap: 6px; }
+.offline-row-actions button {
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+@media (max-width: 480px) {
+  .offline-row { flex-direction: column; align-items: stretch; }
+}

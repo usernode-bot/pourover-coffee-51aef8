@@ -62,6 +62,12 @@
     back: document.getElementById('back-button'),
     home: document.getElementById('home-button'),
     myRecipesButton: document.getElementById('my-recipes-button'),
+    offlineStatus: document.getElementById('offline-status'),
+    offlineStatusLabel: document.getElementById('offline-status-label'),
+    offlineStatusDetails: document.getElementById('offline-status-details'),
+    offlineStatusPanel: document.getElementById('offline-status-panel'),
+    offlineStatusList: document.getElementById('offline-status-list'),
+    offlineStatusClose: document.getElementById('offline-status-close'),
     journalButton: document.getElementById('journal-button'),
     about: document.getElementById('about-button'),
     methodList: document.getElementById('method-list'),
@@ -306,7 +312,14 @@
 
   const DOSE_STORAGE_KEY = 'pourover-coffee:doses:v1';
   const FILTER_PARAM = Object.freeze({ method: 'filterMethod' });
-  const APP_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+  const APP_TOKEN = (() => {
+    const urlToken = new URLSearchParams(window.location.search).get('token') || '';
+    if (urlToken && window.PouroverOffline) window.PouroverOffline.rememberToken(urlToken);
+    // Offline boots carry no token; recover the last verified one from storage.
+    return urlToken
+      || (window.PouroverOffline ? window.PouroverOffline.tokenForOfflineUse() : '')
+      || '';
+  })();
   const state = {
     screen: 'library',
     method: METHODS[0],
@@ -413,6 +426,35 @@
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'That request could not be completed.');
     return payload;
+  }
+
+  // Journal, favorite, and personal-recipe writes go through this wrapper.
+  // When the network is unreachable the write is stored durably and replayed
+  // with its idempotency key after reconnection.
+  function resolveOfflinePath(path) {
+    const [base, query] = String(path).split('?');
+    if (base.startsWith('/api/brews') || base.startsWith('/api/favorites')) {
+      return query ? `${base}?${query}` : base;
+    }
+    const params = new URLSearchParams(query || '');
+    if (params.get('demo') === '1') params.delete('demo');
+    const cleaned = params.toString();
+    return cleaned ? `${base}?${cleaned}` : base;
+  }
+
+  async function queueableFetch(path, options = {}) {
+    const offline = window.PouroverOffline;
+    const method = (options.method || 'GET').toUpperCase();
+    const canQueue = offline && options.body && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+    if (!canQueue) return apiFetch(path, options);
+    const replayPath = resolveOfflinePath(path);
+    try {
+      return await apiFetch(path, options);
+    } catch (error) {
+      if (navigator.onLine) throw error;
+      offline.queueWrite(replayPath, method, options.body ? JSON.parse(options.body) : null);
+      return null;
+    }
   }
 
   function currentPersonalRecipes({ includeArchived = false } = {}) {
@@ -1307,6 +1349,73 @@
     }
   }
 
+  function describeOfflineStatus(status) {
+    const parts = [];
+    if (!navigator.onLine) parts.push('Offline');
+    if (status.pendingCount) parts.push(`${status.pendingCount} change${status.pendingCount === 1 ? '' : 's'} waiting to sync`);
+    if (status.conflictCount) parts.push(`${status.conflictCount} conflict${status.conflictCount === 1 ? '' : 's'} to resolve`);
+    else if (status.failedCount) parts.push(`${status.failedCount} failed change${status.failedCount === 1 ? '' : 's'}`);
+    return parts.join(' · ');
+  }
+
+  function renderOfflineStatus() {
+    const offline = window.PouroverOffline;
+    if (!offline || !elements.offlineStatus) return;
+    const status = offline.status();
+    const hasSignal = Boolean(!navigator.onLine || status.pendingCount || status.conflictCount || status.failedCount);
+    elements.offlineStatus.hidden = !hasSignal;
+    if (!hasSignal) return;
+    const conflict = status.conflictCount > 0;
+    const failed = status.failedCount > 0;
+    elements.offlineStatus.dataset.state = conflict ? 'conflict' : !navigator.onLine ? 'offline' : failed ? 'failed' : 'pending';
+    elements.offlineStatusLabel.textContent = conflict
+      ? `${status.conflictCount} sync conflict${status.conflictCount === 1 ? '' : 's'}`
+      : !navigator.onLine
+        ? (status.pendingCount ? `Offline · ${status.pendingCount} queued` : 'Offline')
+        : failed ? `${status.failedCount} failed sync${status.failedCount === 1 ? '' : 's'}`
+          : `Syncing ${status.pendingCount}`;
+  }
+
+  function renderOfflineDetails() {
+    const offline = window.PouroverOffline;
+    if (!offline || !elements.offlineStatusList) return;
+    const status = offline.status();
+    const rows = [];
+    if (!navigator.onLine) {
+      rows.push('<div class="offline-row" data-kind="offline">Offline now. Cached recipes and the timer still work; your changes are saved on this device.</div>');
+    }
+    if (status.pendingCount) {
+      rows.push(`<div class="offline-row" data-kind="pending">${status.pendingCount} change${status.pendingCount === 1 ? '' : 's'} will sync automatically when the connection returns.</div>`);
+    }
+    if (status.conflictCount || status.failedCount) {
+      const queue = offline.queueItems().filter((item) => item.status === 'conflict' || item.status === 'failed');
+      queue.forEach((item) => {
+        const action = item.status === 'conflict' ? 'Retry with latest server copy' : 'Try again';
+        rows.push(`
+          <div class="offline-row" data-kind="${item.status}">
+            <div>
+              <div class="offline-row-title">${escapeHtml(item.label)}</div>
+              <div class="offline-row-error">${escapeHtml(item.error || 'This change needs your attention.')}</div>
+            </div>
+            <div class="offline-row-actions">
+              <button type="button" data-offline-retry="${item.id}">${action}</button>
+              <button type="button" data-offline-discard="${item.id}">Discard</button>
+            </div>
+          </div>`);
+      });
+    }
+    elements.offlineStatusList.innerHTML = rows.join('') || '<div class="offline-row">Everything you changed is synced.</div>';
+  }
+
+  function openOfflineDetails() {
+    renderOfflineDetails();
+    elements.offlineStatusPanel.hidden = false;
+  }
+
+  function closeOfflineDetails() {
+    elements.offlineStatusPanel.hidden = true;
+  }
+
   function renderMyRecipes() {
     const archived = state.personal.view === 'archived';
     const recipes = state.personal.recipes.filter((recipe) => Boolean(recipe.archived) === archived);
@@ -1522,7 +1631,7 @@
       const path = editing
         ? `/api/personal-recipes/${encodeURIComponent(state.personal.formRecipeId)}`
         : '/api/personal-recipes';
-      const payload = await apiFetch(path, {
+      const payload = await queueableFetch(path, {
         method: editing ? 'PATCH' : 'POST',
         body: JSON.stringify(readPersonalRecipeForm()),
       });
@@ -1547,7 +1656,7 @@
     elements.personalRecipeArchive.disabled = true;
     elements.personalRecipeDetailError.hidden = true;
     try {
-      const payload = await apiFetch(`/api/personal-recipes/${encodeURIComponent(state.recipe.id)}/archive`, {
+      const payload = await queueableFetch(`/api/personal-recipes/${encodeURIComponent(state.recipe.id)}/archive`, {
         method: 'PATCH', body: JSON.stringify({ archived }),
       });
       replacePersonalRecipe(payload.recipe);
@@ -1566,7 +1675,7 @@
     elements.personalRecipeDuplicate.disabled = true;
     elements.personalRecipeDetailError.hidden = true;
     try {
-      const payload = await apiFetch(`/api/personal-recipes/${encodeURIComponent(state.recipe.id)}/duplicate`, { method: 'POST' });
+      const payload = await queueableFetch(`/api/personal-recipes/${encodeURIComponent(state.recipe.id)}/duplicate`, { method: 'POST' });
       replacePersonalRecipe(payload.recipe);
       chooseRecipe(payload.recipe.id);
       history.pushState({ screen: 'recipe', id: payload.recipe.id }, '', urlFor('recipe', payload.recipe.id));
@@ -1585,7 +1694,8 @@
     elements.personalRecipeDetailError.hidden = true;
     try {
       const recipeId = state.recipe.id;
-      await apiFetch(`/api/personal-recipes/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+      const removed = await queueableFetch(`/api/personal-recipes/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+      if (!removed && window.unNative?.toast) window.unNative.toast('Delete queued while offline');
       state.personal.recipes = state.personal.recipes.filter((recipe) => recipe.id !== recipeId);
       populateJournalControls();
       loadShelf({ quiet: true });
@@ -1708,8 +1818,8 @@
 
   async function setFavorite(recipeId, favorite) {
     const request = favorite
-      ? apiFetch(`/api/favorites/${encodeURIComponent(recipeId)}`, { method: 'PUT' })
-      : apiFetch(`/api/favorites/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+      ? queueableFetch(`/api/favorites/${encodeURIComponent(recipeId)}`, { method: 'PUT' })
+      : queueableFetch(`/api/favorites/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
     await request;
     const set = favoriteIdSet();
     if (favorite) set.add(recipeId); else set.delete(recipeId);
@@ -1729,9 +1839,12 @@
     const wasFavorite = isFavoriteRecipe(recipeId);
     button.disabled = true;
     try {
-      await setFavorite(recipeId, !wasFavorite);
+      const result = await setFavorite(recipeId, !wasFavorite);
       if (window.unNative?.toast) {
-        window.unNative.toast(wasFavorite ? 'Removed from favorites' : 'Saved to favorites');
+        const queued = result === null;
+        window.unNative.toast(wasFavorite
+          ? (queued ? 'Favorite change queued while offline' : 'Removed from favorites')
+          : (queued ? 'Favorite queued while offline' : 'Saved to favorites'));
       }
     } catch (error) {
       if (window.unNative?.toast) window.unNative.toast(error.message);
@@ -2132,7 +2245,7 @@
     elements.journalAdjustmentStatus.textContent = 'Saving the next experiment…';
     try {
       const previous = state.journal.entry;
-      const payload = await apiFetch(`/api/brews/${encodeURIComponent(previous.id)}`, {
+      const payload = await queueableFetch(`/api/brews/${encodeURIComponent(previous.id)}`, {
         method: 'PATCH',
         body: JSON.stringify({ changeNextTime: recommendation.change }),
       });
@@ -2356,7 +2469,7 @@
       const body = readJournalForm();
       let payload;
       if (state.journal.formMode === 'edit') {
-        payload = await apiFetch(`/api/brews/${state.journal.entry.id}`, {
+        payload = await queueableFetch(`/api/brews/${state.journal.entry.id}`, {
           method: 'PATCH', body: JSON.stringify(body),
         });
       } else {
@@ -2364,8 +2477,9 @@
         body.recipeVersion = state.recipe.version;
         body.coffee = elements.journalFormDose.value;
         body.source = state.journal.formSource;
-        payload = await apiFetch('/api/brews', { method: 'POST', body: JSON.stringify(body) });
+        payload = await queueableFetch('/api/brews', { method: 'POST', body: JSON.stringify(body) });
       }
+      if (!payload) throw new Error('You are offline. This journal entry is queued and will sync when the connection returns.');
       state.journal.entry = payload.entry;
       state.journal.demo = false;
       await openJournalDetail(payload.entry.id, { historyMode: 'replaceState', transition: 'pop' });
@@ -2413,7 +2527,8 @@
     elements.journalDeleteConfirm.disabled = true;
     elements.journalDetailError.hidden = true;
     try {
-      await apiFetch(`/api/brews/${state.journal.entry.id}`, { method: 'DELETE' });
+      const deleted = await queueableFetch(`/api/brews/${state.journal.entry.id}`, { method: 'DELETE' });
+      if (!deleted && window.unNative?.toast) window.unNative.toast('Delete queued while offline');
       state.journal.entry = null;
       openJournal({ historyMode: 'replaceState', transition: 'pop' });
     } catch (error) {
@@ -2428,6 +2543,13 @@
     if (!state.timer.running) return state.timer.elapsed;
     return state.timer.anchorElapsed + (Date.now() - state.timer.anchorTime) / 1000;
   }
+
+  // The brew clock is anchored to wall-clock time, so it stays accurate in a
+  // background tab or when the device sleeps; a visibility change just forces
+  // the delayed render to catch up immediately.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.timer.running) renderTimer();
+  });
 
   function renderBrewShell() {
     state.lastActiveStepLabel = null;
@@ -3008,6 +3130,34 @@
     }
     const open = event.target.closest('.collection-recipe-open');
     if (open) navigate('recipe', open.dataset.recipeId, { transition: 'push' });
+  });
+
+  // Screenshot-state hook so reviewers can open the sync status panel on a
+  // fully synced device; the panel always explains the current offline state.
+  if (new URLSearchParams(window.location.search).get('offline') === 'shot') {
+    openOfflineDetails();
+  }
+
+  // Offline sync status wiring.
+  if (window.PouroverOffline) {
+    window.PouroverOffline.init(APP_TOKEN);
+    window.PouroverOffline.subscribe(() => renderOfflineStatus());
+    window.addEventListener('online', () => renderOfflineStatus());
+    window.addEventListener('offline', () => renderOfflineStatus());
+    renderOfflineStatus();
+  }
+  elements.offlineStatusDetails?.addEventListener('click', () => {
+    elements.offlineStatusPanel.hidden ? openOfflineDetails() : closeOfflineDetails();
+  });
+  elements.offlineStatusClose?.addEventListener('click', closeOfflineDetails);
+  elements.offlineStatusList?.addEventListener('click', (event) => {
+    const offline = window.PouroverOffline;
+    if (!offline) return;
+    const retry = event.target.closest('[data-offline-retry]');
+    const discard = event.target.closest('[data-offline-discard]');
+    if (retry) offline.retry(retry.dataset.offlineRetry);
+    if (discard) offline.discard(discard.dataset.offlineDiscard);
+    renderOfflineDetails();
   });
 
   populateFilters();
