@@ -80,11 +80,11 @@
       "name": "Library filters to favorites",
       "path": "/?favorites=1&demo=1",
       "expectText": "Favorites",
-      "expectSelector": "#recipe-list .brew-recipe-card[data-recipe-id=\"v60-sweet-pulse\"]"
+      "expectSelector": "#recipe-list .brew-recipe-shell[data-recipe-id=\"v60-sweet-pulse\"] > .favorite-toggle"
     },
     {
       "id": "shelf.favorites",
-      "name": "Favorites shelf lists saved recipes",
+      "name": "Favorites shelf renders cards with a favorite heart",
       "path": "/?shelf=favorites&demo=1",
       "visual": true,
       "impact": [

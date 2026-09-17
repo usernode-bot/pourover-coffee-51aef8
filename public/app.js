@@ -401,7 +401,7 @@
     const scaled = scaleRecipe(recipe, selectedDose(recipe));
     const tags = primaryTags(recipe).map((tag) => `<span class="recipe-tag">${tag}</span>`).join('');
     return `
-      <div class="brew-recipe-shell" style="--card-accent:${method.accent};--card-soft:${method.soft}">
+      <div class="brew-recipe-shell" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
         <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}">
           <span class="brew-recipe-topline">
             <span>${method.name}</span>
@@ -1182,7 +1182,7 @@
     const method = getMethod(recipe.methodId);
     const favorite = isFavoriteRecipe(recipe.id);
     return `
-      <div class="shelf-recipe-shell" style="--card-accent:${method.accent};--card-soft:${method.soft}">
+      <div class="shelf-recipe-shell" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
         <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}">
           <span class="brew-recipe-topline">
             <span>${escapeHtml(method.name)}</span>

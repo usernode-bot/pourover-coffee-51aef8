@@ -1646,6 +1646,14 @@ textarea:focus-visible,
   width: 100%;
 }
 
+/* The favorite heart floats over the card's top-right corner, so reserve that
+   space in the card's own top line (the method name and the ratio/time pair).
+   Without this the heart sits on top of the time text. */
+.brew-recipe-shell .brew-recipe-topline,
+.shelf-recipe-shell .brew-recipe-topline {
+  padding-right: 2.7rem;
+}
+
 .favorite-toggle {
   position: absolute;
   top: 0.85rem;
