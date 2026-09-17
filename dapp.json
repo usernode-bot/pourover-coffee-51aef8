@@ -201,6 +201,62 @@
         "styles/**",
         "dapp.json"
       ]
+    },
+    {
+      "id": "personal-recipes.library",
+      "name": "Private recipe book shows active personal recipes",
+      "path": "/?myRecipes=1&demo=1",
+      "expectText": "Weekday honey V60",
+      "expectSelector": "#personal-recipes-list .personal-recipe-card[data-recipe-id]",
+      "visual": true,
+      "impact": [
+        "personal-recipe-store.js",
+        "public/**",
+        "server.js",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "personal-recipes.lineage",
+      "name": "A personal variant retains its source recipe",
+      "path": "/?recipe=personal-00000000-0000-4000-8000-000000000013&demo=1",
+      "expectText": "Based on Sweet pulse v1",
+      "expectSelector": "#personal-recipe-actions:not([hidden])",
+      "visual": true,
+      "impact": [
+        "personal-recipe-store.js",
+        "public/**",
+        "server.js",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "personal-recipes.editor",
+      "name": "A brewer can make a private recipe variant",
+      "path": "/?recipeEditor=new&source=v60-bright&demo=1",
+      "expectText": "Make it your own",
+      "expectSelector": "#personal-recipe-steps .personal-recipe-step-editor",
+      "visual": true,
+      "impact": [
+        "personal-recipe-store.js",
+        "public/**",
+        "server.js",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "personal-recipes.timer",
+      "name": "A personal recipe works in the guided timer",
+      "path": "/?brew=personal-00000000-0000-4000-8000-000000000013&shot=active&demo=1",
+      "expectText": "Now",
+      "expectSelector": "#timer-panel[data-focus=\"active\"]",
+      "visual": true,
+      "impact": [
+        "personal-recipe-store.js",
+        "public/**",
+        "server.js",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {

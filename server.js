@@ -10,10 +10,10 @@ const {
   RECIPE_REVISIONS,
   createRecipeSnapshot,
   getRecipeRevision,
-  isCurrentRecipeRevision,
 } = require('./public/recipes');
 const journal = require('./journal-store');
 const collections = require('./collection-store');
+const personalRecipes = require('./personal-recipe-store');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -90,17 +90,33 @@ function requireShelf(res) {
   return false;
 }
 
-function entryForClient(entry) {
+function requirePersonalRecipes(res) {
+  if (pool) return true;
+  res.status(503).json({ error: 'Personal recipes are unavailable right now.' });
+  return false;
+}
+
+function entryForClient(entry, personalCurrent = new Map()) {
   if (!entry) return null;
-  const current = RECIPES.find((recipe) => recipe.id === entry.recipeId);
+  const current = RECIPES.find((recipe) => recipe.id === entry.recipeId)
+    || personalCurrent.get(entry.recipeId);
+  const builtInRevision = RECIPE_REVISIONS.find(
+    (recipe) => recipe.id === entry.recipeId && recipe.version === entry.recipeVersion
+  );
   return {
     ...entry,
     currentRecipeVersion: current?.version || null,
-    isCurrentRecipeRevision: isCurrentRecipeRevision({
-      id: entry.recipeId,
-      version: entry.recipeVersion,
-    }),
+    isCurrentRecipeRevision: current?.version === entry.recipeVersion,
+    recipeRevisionAvailable: entry.recipeId.startsWith('personal-')
+      ? personalCurrent.has(entry.recipeId)
+      : Boolean(builtInRevision),
   };
+}
+
+async function entriesForClient(userId, entries) {
+  const current = await personalRecipes.listPersonalRecipes(pool, userId, { includeArchived: true });
+  const personalCurrent = new Map(current.map((recipe) => [recipe.id, recipe]));
+  return entries.map((entry) => entryForClient(entry, personalCurrent));
 }
 
 function demoJournalEntries() {
@@ -160,6 +176,70 @@ function demoJournalEntries() {
   ];
 }
 
+function builtInRecipeForReference(reference) {
+  const raw = String(reference || '').trim();
+  const revision = RECIPE_REVISIONS.find((recipe) => recipe.revisionId === raw);
+  if (revision) return revision;
+  return RECIPES.find((recipe) => recipe.id === raw) || null;
+}
+
+async function resolveRecipeForUser(userId, reference) {
+  return builtInRecipeForReference(reference)
+    || personalRecipes.getPersonalRecipe(pool, userId, reference);
+}
+
+function demoPersonalRecipes() {
+  const source = getRecipeRevision('v60-sweet-pulse@1');
+  const archivedSource = getRecipeRevision('clever-water-first@1');
+  const makeDemo = (recipe, overrides) => ({
+    ...recipe,
+    tags: Object.fromEntries(Object.entries(recipe.tags).map(([key, values]) => [key, [...values]])),
+    steps: recipe.steps.map((step) => ({ ...step })),
+    attribution: { label: 'Your private recipe', kind: 'personal' },
+    equipment: METHODS.find((method) => method.id === recipe.methodId)?.equipment,
+    notes: null,
+    isPersonal: true,
+    archived: false,
+    createdAt: '2026-09-17T12:00:00.000Z',
+    updatedAt: '2026-09-17T12:00:00.000Z',
+    ...overrides,
+  });
+  return [
+    makeDemo(source, {
+      id: 'personal-00000000-0000-4000-8000-000000000013',
+      version: 2,
+      revisionId: 'personal-00000000-0000-4000-8000-000000000013@2',
+      publishedAt: '2026-09-17',
+      title: 'Weekday honey V60',
+      summary: 'A personal version with a gentler final pulse for the coffee on my shelf.',
+      result: 'Expect honeyed sweetness, clear stone fruit, and a softer finish.',
+      notes: 'Keep the last pulse low and centered.',
+      equipment: 'V60 02, tabbed paper filter, hand grinder, server, scale, and kettle',
+      parentRecipe: {
+        id: source.id,
+        revisionId: source.revisionId,
+        title: source.title,
+        attribution: source.attribution.label,
+      },
+    }),
+    makeDemo(archivedSource, {
+      id: 'personal-00000000-0000-4000-8000-000000000014',
+      version: 1,
+      revisionId: 'personal-00000000-0000-4000-8000-000000000014@1',
+      publishedAt: '2026-09-16',
+      title: 'Old office Clever',
+      summary: 'An archived private recipe kept for past journal entries.',
+      archived: true,
+      parentRecipe: {
+        id: archivedSource.id,
+        revisionId: archivedSource.revisionId,
+        title: archivedSource.title,
+        attribution: archivedSource.attribution.label,
+      },
+    }),
+  ];
+}
+
 function sendJournalError(res, error) {
   if (error instanceof journal.JournalValidationError) {
     return res.status(400).json({ error: error.message });
@@ -189,11 +269,12 @@ app.get('/api/brews', async (req, res) => {
     if (!requireJournal(res)) return undefined;
     const methodId = METHODS.some((method) => method.id === req.query.methodId)
       ? req.query.methodId : null;
-    const recipeId = RECIPES.some((recipe) => recipe.id === req.query.recipeId)
-      ? req.query.recipeId : null;
+    const requestedRecipeId = String(req.query.recipeId || '').trim();
+    const recipeId = requestedRecipeId && requestedRecipeId.length <= 120
+      ? requestedRecipeId : null;
     const q = String(req.query.q || '').trim().slice(0, 120);
     const entries = await journal.listEntries(pool, req.user.id, { methodId, recipeId, q });
-    return res.json({ entries: entries.map(entryForClient), demo: false });
+    return res.json({ entries: await entriesForClient(req.user.id, entries), demo: false });
   } catch (error) {
     return sendJournalError(res, error);
   }
@@ -210,7 +291,7 @@ app.get('/api/brews/:id', async (req, res) => {
     if (!entryId) return res.status(404).json({ error: 'Brew entry not found.' });
     const entry = await journal.getEntry(pool, req.user.id, entryId);
     return entry
-      ? res.json({ entry: entryForClient(entry), demo: false })
+      ? res.json({ entry: (await entriesForClient(req.user.id, [entry]))[0], demo: false })
       : res.status(404).json({ error: 'Brew entry not found.' });
   } catch (error) {
     return sendJournalError(res, error);
@@ -221,13 +302,13 @@ app.post('/api/brews', async (req, res) => {
   try {
     if (!requireJournal(res)) return undefined;
     const input = journal.normalizeCreateInput(req.body);
-    const recipe = getRecipeRevision(input.recipeId, input.recipeVersion);
+    const recipe = await resolveRecipeForUser(req.user.id, `${input.recipeId}@${input.recipeVersion}`);
     if (!recipe || recipe.id !== input.recipeId) {
       return res.status(400).json({ error: 'That recipe version is not available.' });
     }
     const snapshot = createRecipeSnapshot(recipe, input.coffee);
     const entry = await journal.createEntry(pool, req.user, input, snapshot);
-    return res.status(201).json({ entry: entryForClient(entry) });
+    return res.status(201).json({ entry: (await entriesForClient(req.user.id, [entry]))[0] });
   } catch (error) {
     return sendJournalError(res, error);
   }
@@ -257,6 +338,111 @@ app.delete('/api/brews/:id', async (req, res) => {
     return deleted ? res.status(204).end() : res.status(404).json({ error: 'Brew entry not found.' });
   } catch (error) {
     return sendJournalError(res, error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Private custom recipes and immutable personal revisions.
+// ---------------------------------------------------------------------------
+
+function sendPersonalRecipeError(res, error) {
+  if (error instanceof personalRecipes.PersonalRecipeValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  console.error(`Personal recipe request failed: ${error.message}`);
+  return res.status(500).json({ error: 'The personal recipe could not complete that request.' });
+}
+
+app.get('/api/personal-recipes', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') {
+      return res.json({ recipes: demoPersonalRecipes(), demo: true });
+    }
+    if (!requirePersonalRecipes(res)) return undefined;
+    const recipes = await personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: true });
+    return res.json({ recipes, demo: false });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
+  }
+});
+
+app.get('/api/personal-recipes/:recipeId', async (req, res) => {
+  try {
+    if (!requirePersonalRecipes(res)) return undefined;
+    const recipe = await personalRecipes.getPersonalRecipe(pool, req.user.id, req.params.recipeId);
+    return recipe
+      ? res.json({ recipe })
+      : res.status(404).json({ error: 'Personal recipe not found.' });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
+  }
+});
+
+app.post('/api/personal-recipes', async (req, res) => {
+  try {
+    if (!requirePersonalRecipes(res)) return undefined;
+    const parentRef = typeof req.body?.parentRecipeRef === 'string'
+      ? req.body.parentRecipeRef.trim() : '';
+    const parent = parentRef ? await resolveRecipeForUser(req.user.id, parentRef) : null;
+    if (parentRef && !parent) {
+      return res.status(400).json({ error: 'The source recipe is not available.' });
+    }
+    const recipe = await personalRecipes.createPersonalRecipe(pool, req.user, req.body, parent);
+    return res.status(201).json({ recipe });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
+  }
+});
+
+app.patch('/api/personal-recipes/:recipeId', async (req, res) => {
+  try {
+    if (!requirePersonalRecipes(res)) return undefined;
+    const recipe = await personalRecipes.updatePersonalRecipe(
+      pool, req.user.id, req.params.recipeId, req.body
+    );
+    return recipe
+      ? res.json({ recipe })
+      : res.status(404).json({ error: 'Personal recipe not found.' });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
+  }
+});
+
+app.patch('/api/personal-recipes/:recipeId/archive', async (req, res) => {
+  try {
+    if (!requirePersonalRecipes(res)) return undefined;
+    const recipe = await personalRecipes.setPersonalRecipeArchived(
+      pool, req.user.id, req.params.recipeId, req.body?.archived !== false
+    );
+    return recipe
+      ? res.json({ recipe })
+      : res.status(404).json({ error: 'Personal recipe not found.' });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
+  }
+});
+
+app.post('/api/personal-recipes/:recipeId/duplicate', async (req, res) => {
+  try {
+    if (!requirePersonalRecipes(res)) return undefined;
+    const source = await personalRecipes.getPersonalRecipe(pool, req.user.id, req.params.recipeId);
+    if (!source) return res.status(404).json({ error: 'Personal recipe not found.' });
+    const recipe = await personalRecipes.duplicatePersonalRecipe(pool, req.user, source);
+    return res.status(201).json({ recipe });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
+  }
+});
+
+app.delete('/api/personal-recipes/:recipeId', async (req, res) => {
+  try {
+    if (!requirePersonalRecipes(res)) return undefined;
+    const deleted = await personalRecipes.deletePersonalRecipe(pool, req.user.id, req.params.recipeId);
+    return deleted
+      ? res.status(204).end()
+      : res.status(404).json({ error: 'Personal recipe not found.' });
+  } catch (error) {
+    return sendPersonalRecipeError(res, error);
   }
 });
 
@@ -293,9 +479,13 @@ function recipeSummary(recipe) {
 // Stable recipe ids resolve to the latest revision, and ids that no longer
 // exist are dropped rather than failing the whole shelf. That is what keeps a
 // favorite or a collection working when a recipe later gains a revision.
-function knownRecipeSummaries(recipeIds) {
+function knownRecipeSummaries(recipeIds, ownedPersonal = []) {
+  const lookup = new Map([
+    ...RECIPES.map((recipe) => [recipe.id, recipe]),
+    ...ownedPersonal.filter((recipe) => !recipe.archived).map((recipe) => [recipe.id, recipe]),
+  ]);
   return recipeIds
-    .map((recipeId) => RECIPES.find((recipe) => recipe.id === recipeId))
+    .map((recipeId) => lookup.get(recipeId))
     .filter(Boolean)
     .map(recipeSummary);
 }
@@ -303,11 +493,11 @@ function knownRecipeSummaries(recipeIds) {
 // One client shape for a collection: hydrated latest-revision summaries, in
 // the stored order. Every collection route returns this, so the frontend
 // never has to resolve recipe ids itself.
-function collectionForClient(collection) {
+function collectionForClient(collection, ownedPersonal = []) {
   return {
     id: collection.id,
     name: collection.name,
-    recipes: knownRecipeSummaries(collection.recipeIds || []),
+    recipes: knownRecipeSummaries(collection.recipeIds || [], ownedPersonal),
   };
 }
 
@@ -340,17 +530,20 @@ app.get('/api/shelf', async (req, res) => {
       return res.json({
         demo: true,
         favorites: knownRecipeSummaries(demoFavorites()),
-        collections: demoCollections().map(collectionForClient),
+        collections: demoCollections().map((collection) => collectionForClient(collection)),
         recentlyBrewed: knownRecipeSummaries(demoRecentlyBrewed()),
       });
     }
     if (!requireShelf(res)) return undefined;
-    const shelf = await collections.loadShelf(pool, req.user.id);
+    const [shelf, ownedPersonal] = await Promise.all([
+      collections.loadShelf(pool, req.user.id),
+      personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false }),
+    ]);
     return res.json({
       demo: false,
-      favorites: knownRecipeSummaries(shelf.favorites),
-      collections: shelf.collections.map(collectionForClient),
-      recentlyBrewed: knownRecipeSummaries(shelf.recentlyBrewed),
+      favorites: knownRecipeSummaries(shelf.favorites, ownedPersonal),
+      collections: shelf.collections.map((collection) => collectionForClient(collection, ownedPersonal)),
+      recentlyBrewed: knownRecipeSummaries(shelf.recentlyBrewed, ownedPersonal),
     });
   } catch (error) {
     return sendShelfError(res, error);
@@ -370,7 +563,8 @@ app.put('/api/favorites/:recipeId', async (req, res) => {
   try {
     if (!requireShelf(res)) return undefined;
     const recipeId = collections.normalizeRecipeId(req.params.recipeId);
-    if (!RECIPES.some((recipe) => recipe.id === recipeId)) {
+    const recipe = await resolveRecipeForUser(req.user.id, recipeId);
+    if (!recipe || recipe.archived) {
       return res.status(404).json({ error: 'That recipe is not available.' });
     }
     await collections.addFavorite(pool, req.user.id, recipeId);
@@ -394,8 +588,11 @@ app.delete('/api/favorites/:recipeId', async (req, res) => {
 app.get('/api/collections', async (req, res) => {
   try {
     if (!requireShelf(res)) return undefined;
-    const list = await collections.listCollections(pool, req.user.id);
-    return res.json({ collections: list.map(collectionForClient) });
+    const [list, ownedPersonal] = await Promise.all([
+      collections.listCollections(pool, req.user.id),
+      personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false }),
+    ]);
+    return res.json({ collections: list.map((collection) => collectionForClient(collection, ownedPersonal)) });
   } catch (error) {
     return sendShelfError(res, error);
   }
@@ -414,8 +611,11 @@ app.post('/api/collections', async (req, res) => {
 app.patch('/api/collections/order', async (req, res) => {
   try {
     if (!requireShelf(res)) return undefined;
-    const list = await collections.reorderCollections(pool, req.user.id, req.body?.collectionIds);
-    return res.json({ collections: list.map(collectionForClient) });
+    const [list, ownedPersonal] = await Promise.all([
+      collections.reorderCollections(pool, req.user.id, req.body?.collectionIds),
+      personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false }),
+    ]);
+    return res.json({ collections: list.map((collection) => collectionForClient(collection, ownedPersonal)) });
   } catch (error) {
     return sendShelfError(res, error);
   }
@@ -428,7 +628,11 @@ app.patch('/api/collections/:id', async (req, res) => {
     if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
     const renamed = await collections.renameCollection(pool, req.user.id, collectionId, req.body?.name);
     if (!renamed) return res.status(404).json({ error: 'Collection not found.' });
-    return res.json({ collection: collectionForClient(await collections.getCollection(pool, req.user.id, collectionId)) });
+    const [collection, ownedPersonal] = await Promise.all([
+      collections.getCollection(pool, req.user.id, collectionId),
+      personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false }),
+    ]);
+    return res.json({ collection: collectionForClient(collection, ownedPersonal) });
   } catch (error) {
     return sendShelfError(res, error);
   }
@@ -452,12 +656,14 @@ app.post('/api/collections/:id/recipes', async (req, res) => {
     const collectionId = collections.parseCollectionId(req.params.id);
     if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
     const recipeId = collections.normalizeRecipeId(req.body?.recipeId);
-    if (!RECIPES.some((recipe) => recipe.id === recipeId)) {
+    const recipe = await resolveRecipeForUser(req.user.id, recipeId);
+    if (!recipe || recipe.archived) {
       return res.status(404).json({ error: 'That recipe is not available.' });
     }
     const collection = await collections.addRecipeToCollection(pool, req.user.id, collectionId, recipeId);
     if (!collection) return res.status(404).json({ error: 'Collection not found.' });
-    return res.status(201).json({ collection: collectionForClient(collection) });
+    const ownedPersonal = await personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false });
+    return res.status(201).json({ collection: collectionForClient(collection, ownedPersonal) });
   } catch (error) {
     return sendShelfError(res, error);
   }
@@ -472,7 +678,8 @@ app.delete('/api/collections/:id/recipes/:recipeId', async (req, res) => {
       pool, req.user.id, collectionId, req.params.recipeId
     );
     if (!collection) return res.status(404).json({ error: 'Collection not found.' });
-    return res.json({ collection });
+    const ownedPersonal = await personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false });
+    return res.json({ collection: collectionForClient(collection, ownedPersonal) });
   } catch (error) {
     return sendShelfError(res, error);
   }
@@ -487,7 +694,8 @@ app.patch('/api/collections/:id/order', async (req, res) => {
       pool, req.user.id, collectionId, req.body?.recipeIds
     );
     if (!collection) return res.status(404).json({ error: 'Collection not found.' });
-    return res.json({ collection: collectionForClient(collection) });
+    const ownedPersonal = await personalRecipes.listPersonalRecipes(pool, req.user.id, { includeArchived: false });
+    return res.json({ collection: collectionForClient(collection, ownedPersonal) });
   } catch (error) {
     return sendShelfError(res, error);
   }
@@ -546,8 +754,9 @@ async function boot() {
   try {
     await journal.initializeJournal(pool);
     await collections.initializeCollections(pool);
+    await personalRecipes.initializePersonalRecipes(pool);
   } catch (error) {
-    console.error(`Brew journal schema failed: ${error.message}`);
+    console.error(`Private data schema failed: ${error.message}`);
     process.exit(1);
     return;
   }

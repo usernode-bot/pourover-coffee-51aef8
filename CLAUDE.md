@@ -83,6 +83,12 @@ Chemex, and AeroPress.
   verified Homeroom user id, and preserve `recipe_snapshot` when editable
   notes or setup fields change. Recipe snapshots are created server-side from
   a known revision and include the scaled instructions used for that cup.
+- Personal recipes and their append-only revisions are private PostgreSQL
+  records. Keep both `personal_recipes` and `personal_recipe_revisions`
+  marked `staging:private`, scope every query to the verified user id, and
+  insert a new numbered revision for every brew-defining edit. Archive state
+  is reversible metadata on the stable recipe. Deleting a personal recipe
+  must never delete or rewrite a journal snapshot.
 - Glossary copy lives in `public/glossary.js`, deliberately separate from
   `public/recipes.js`. Terms are keyed by stable ids, and taxonomy values and
   timer step labels map onto those ids rather than restating definitions.

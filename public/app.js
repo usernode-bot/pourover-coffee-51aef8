@@ -19,7 +19,6 @@
     getRecipe,
     getRecipeRevision,
     getRecipeTimeline,
-    getRecipesForMethod,
     getStepStart,
     getTagLabel,
     isCurrentRecipeRevision,
@@ -44,6 +43,8 @@
     journal: document.getElementById('journal-screen'),
     journalDetail: document.getElementById('journal-detail-screen'),
     journalForm: document.getElementById('journal-form-screen'),
+    myRecipes: document.getElementById('my-recipes-screen'),
+    recipeForm: document.getElementById('recipe-form-screen'),
     shelf: document.getElementById('shelf-screen'),
     collection: document.getElementById('collection-screen'),
     glossary: document.getElementById('glossary-screen'),
@@ -52,6 +53,7 @@
   const elements = {
     back: document.getElementById('back-button'),
     home: document.getElementById('home-button'),
+    myRecipesButton: document.getElementById('my-recipes-button'),
     journalButton: document.getElementById('journal-button'),
     about: document.getElementById('about-button'),
     methodList: document.getElementById('method-list'),
@@ -80,6 +82,7 @@
     recipeAttribution: document.getElementById('recipe-attribution'),
     recipeResult: document.getElementById('recipe-result'),
     recipeTagGroups: document.getElementById('recipe-tag-groups'),
+    recipePrivateNotes: document.getElementById('recipe-private-notes'),
     coffeeDose: document.getElementById('coffee-dose'),
     doseMinus: document.getElementById('dose-minus'),
     dosePlus: document.getElementById('dose-plus'),
@@ -196,6 +199,42 @@
     recipeFavoriteButton: document.getElementById('recipe-favorite-button'),
     recipeFavoriteLabel: document.getElementById('recipe-favorite-label'),
     recipeCollectionsButton: document.getElementById('recipe-collections-button'),
+    recipeVariantButton: document.getElementById('recipe-variant-button'),
+    recipeVariantLabel: document.getElementById('recipe-variant-label'),
+    personalRecipeActions: document.getElementById('personal-recipe-actions'),
+    personalRecipeEdit: document.getElementById('personal-recipe-edit'),
+    personalRecipeDuplicate: document.getElementById('personal-recipe-duplicate'),
+    personalRecipeArchive: document.getElementById('personal-recipe-archive'),
+    personalRecipeDelete: document.getElementById('personal-recipe-delete'),
+    personalRecipeDeleteConfirmation: document.getElementById('personal-recipe-delete-confirmation'),
+    personalRecipeDeleteCancel: document.getElementById('personal-recipe-delete-cancel'),
+    personalRecipeDeleteConfirm: document.getElementById('personal-recipe-delete-confirm'),
+    personalRecipeDetailError: document.getElementById('personal-recipe-detail-error'),
+    myRecipesTitle: document.getElementById('my-recipes-title'),
+    personalRecipesActive: document.getElementById('personal-recipes-active'),
+    personalRecipesArchived: document.getElementById('personal-recipes-archived'),
+    personalRecipeNew: document.getElementById('personal-recipe-new'),
+    personalRecipesStatus: document.getElementById('personal-recipes-status'),
+    personalRecipesList: document.getElementById('personal-recipes-list'),
+    personalRecipesEmpty: document.getElementById('personal-recipes-empty'),
+    personalRecipesEmptyTitle: document.getElementById('personal-recipes-empty-title'),
+    personalRecipesEmptyCopy: document.getElementById('personal-recipes-empty-copy'),
+    personalRecipesEmptyAction: document.getElementById('personal-recipes-empty-action'),
+    personalRecipesError: document.getElementById('personal-recipes-error'),
+    personalRecipesErrorCopy: document.getElementById('personal-recipes-error-copy'),
+    personalRecipesRetry: document.getElementById('personal-recipes-retry'),
+    recipeFormKicker: document.getElementById('recipe-form-kicker'),
+    recipeFormTitle: document.getElementById('recipe-form-title'),
+    recipeFormIntro: document.getElementById('recipe-form-intro'),
+    recipeFormSource: document.getElementById('recipe-form-source'),
+    personalRecipeForm: document.getElementById('personal-recipe-form'),
+    personalRecipeTags: document.getElementById('personal-recipe-tags'),
+    personalRecipeWaterTotal: document.getElementById('personal-recipe-water-total'),
+    personalRecipeAddStep: document.getElementById('personal-recipe-add-step'),
+    personalRecipeSteps: document.getElementById('personal-recipe-steps'),
+    personalRecipeFormError: document.getElementById('personal-recipe-form-error'),
+    personalRecipeFormSave: document.getElementById('personal-recipe-form-save'),
+    personalRecipeFormCancel: document.getElementById('personal-recipe-form-cancel'),
     collectionScreen: document.getElementById('collection-screen'),
     collectionTitle: document.getElementById('collection-title'),
     collectionCount: document.getElementById('collection-count'),
@@ -285,6 +324,19 @@
     },
     shelfFilters: { favorites: false, brewed: false },
     collection: { id: null, recipeId: null },
+    personal: {
+      recipes: [],
+      historical: [],
+      loaded: false,
+      loadedDemo: null,
+      demo: false,
+      view: 'active',
+      formMode: 'create',
+      formRecipeId: null,
+      parentRecipeRef: null,
+      returnTo: 'myRecipes',
+      steps: [],
+    },
   };
 
   function loadDoses() {
@@ -337,11 +389,51 @@
     const response = await fetch(path, { ...options, headers });
     if (response.status === 204) return null;
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || 'The brew journal request failed.');
+    if (!response.ok) throw new Error(payload.error || 'That request could not be completed.');
     return payload;
   }
 
+  function currentPersonalRecipes({ includeArchived = false } = {}) {
+    return state.personal.recipes.filter((recipe) => includeArchived || !recipe.archived);
+  }
+
+  function selectableRecipes() {
+    return [...RECIPES, ...currentPersonalRecipes()];
+  }
+
+  function findPersonalRecipe(reference) {
+    const raw = String(reference || '');
+    return [...state.personal.recipes, ...state.personal.historical].find((recipe) => (
+      recipe.id === raw || recipe.revisionId === raw
+    )) || null;
+  }
+
+  function findRecipe(reference) {
+    return findPersonalRecipe(reference)
+      || RECIPE_REVISIONS.find((recipe) => recipe.revisionId === reference)
+      || RECIPES.find((recipe) => recipe.id === reference)
+      || null;
+  }
+
+  async function loadPersonalRevision(reference) {
+    const raw = String(reference || '').trim();
+    if (!/^personal-[0-9a-f-]{36}@\d+$/i.test(raw) || findPersonalRecipe(raw)) return;
+    try {
+      const payload = await apiFetch(`/api/personal-recipes/${encodeURIComponent(raw)}`);
+      state.personal.historical = [
+        payload.recipe,
+        ...state.personal.historical.filter((recipe) => recipe.revisionId !== payload.recipe.revisionId),
+      ];
+    } catch {
+      // The normal route fallback handles missing, deleted, or unowned revisions.
+    }
+  }
+
   function recipeRouteReference(recipe) {
+    if (recipe?.isPersonal) {
+      const current = state.personal.recipes.find((candidate) => candidate.id === recipe.id);
+      return current?.version === recipe.version ? recipe.id : recipe.revisionId;
+    }
     return isCurrentRecipeRevision(recipe) ? recipe.id : recipe.revisionId;
   }
 
@@ -381,7 +473,7 @@
   }
 
   function methodCard(method) {
-    const recipeCount = getRecipesForMethod(method.id).length;
+    const recipeCount = selectableRecipes().filter((recipe) => recipe.methodId === method.id).length;
     return `
       <button class="recipe-card method-card" type="button" data-method-id="${method.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}" aria-label="Browse ${recipeCount} ${method.name} recipes">
         <span class="recipe-card-number">METHOD ${method.number}</span>
@@ -408,18 +500,18 @@
   function recipeCard(recipe) {
     const method = getMethod(recipe.methodId);
     const scaled = scaleRecipe(recipe, selectedDose(recipe));
-    const tags = primaryTags(recipe).map((tag) => `<span class="recipe-tag">${tag}</span>`).join('');
+    const tags = primaryTags(recipe).map((tag) => `<span class="recipe-tag">${escapeHtml(tag)}</span>`).join('');
     return `
-      <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
+      <button class="brew-recipe-card${recipe.isPersonal ? ' personal-recipe-card' : ''}" type="button" data-recipe-id="${escapeHtml(recipe.id)}" data-archived="${Boolean(recipe.archived)}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
         <span class="brew-recipe-topline">
-          <span>${method.name}</span>
+          <span${recipe.isPersonal ? ' class="private-badge"' : ''}>${recipe.isPersonal ? 'Private · ' : ''}${escapeHtml(method.name)}</span>
           <span>1:${formatRatio(recipe.ratio)} · ${formatDuration(scaled.totalDuration)}</span>
         </span>
-        <span class="brew-recipe-title">${recipe.title}</span>
-        <span class="brew-recipe-summary">${recipe.summary}</span>
+        <span class="brew-recipe-title">${escapeHtml(recipe.title)}</span>
+        <span class="brew-recipe-summary">${escapeHtml(recipe.summary)}</span>
         <span class="recipe-tags" aria-label="Recipe tags">${tags}</span>
         <span class="brew-recipe-footer">
-          <span>${recipe.difficulty} · ${recipe.attribution.label}</span>
+          <span>${escapeHtml(recipe.difficulty)} · ${escapeHtml(recipe.attribution.label)}</span>
           <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
         </span>
       </button>`;
@@ -433,6 +525,9 @@
     const methodSelect = elements.filters.elements.method;
     methodSelect.innerHTML = '<option value="">All methods</option>'
       + METHODS.map((method) => `<option value="${method.id}">${method.name}</option>`).join('');
+    elements.personalRecipeForm.elements.methodId.innerHTML = METHODS.map(
+      (method) => `<option value="${method.id}">${method.name}</option>`
+    ).join('');
     for (const facet of TAG_KEYS) {
       const select = elements.filters.elements[facet];
       const taxonomy = TAG_TAXONOMY[facet];
@@ -442,12 +537,13 @@
   }
 
   function populateJournalControls() {
+    const recipes = selectableRecipes();
     elements.journalFilters.elements.methodId.innerHTML = '<option value="">All methods</option>'
       + METHODS.map((method) => `<option value="${method.id}">${method.name}</option>`).join('');
     elements.journalFilters.elements.recipeId.innerHTML = '<option value="">All recipes</option>'
-      + RECIPES.map((recipe) => `<option value="${recipe.id}">${getMethod(recipe.methodId).name}: ${recipe.title}</option>`).join('');
-    elements.journalFormRecipe.innerHTML = RECIPES.map((recipe) => (
-      `<option value="${recipe.id}">${getMethod(recipe.methodId).name}: ${recipe.title} (v${recipe.version})</option>`
+      + recipes.map((recipe) => `<option value="${escapeHtml(recipe.id)}">${recipe.isPersonal ? 'Private: ' : ''}${escapeHtml(getMethod(recipe.methodId).name)}: ${escapeHtml(recipe.title)}</option>`).join('');
+    elements.journalFormRecipe.innerHTML = recipes.map((recipe) => (
+      `<option value="${escapeHtml(recipe.id)}">${recipe.isPersonal ? 'Private: ' : ''}${escapeHtml(getMethod(recipe.methodId).name)}: ${escapeHtml(recipe.title)} (v${recipe.version})</option>`
     )).join('');
     const ratings = '<option value="">Not rated</option>'
       + [1, 2, 3, 4, 5].map((rating) => `<option value="${rating}">${rating}</option>`).join('');
@@ -467,7 +563,7 @@
     const aboutCount = document.querySelector('#about-content [data-recipe-count-copy]');
     if (aboutCount) aboutCount.textContent = `${RECIPES.length} original recipes give you distinct starting points across manual brewing methods, coffees, and cup profiles.`;
     elements.methodList.innerHTML = METHODS.map(methodCard).join('');
-    let filtered = filterRecipes(state.filters);
+    let filtered = filterRecipes(state.filters, selectableRecipes());
     const shelfFilterActive = state.shelfFilters.favorites || state.shelfFilters.brewed;
     // Degrade open: if the shelf could not be loaded, an empty filter set would
     // hide the whole library. Better to show everything and say so than to
@@ -511,7 +607,7 @@
 
   function renderMethod() {
     const method = state.method;
-    const recipes = getRecipesForMethod(method.id);
+    const recipes = selectableRecipes().filter((recipe) => recipe.methodId === method.id);
     elements.methodHero.style.setProperty('--recipe-accent', method.accent);
     elements.methodHero.style.setProperty('--recipe-soft', method.soft);
     elements.methodCharacter.textContent = `${method.character} · ${method.family} · ${method.filterMaterial}`;
@@ -524,7 +620,7 @@
   }
 
   function chooseRecipe(id) {
-    state.recipe = getRecipeRevision(id) || getRecipe(id);
+    state.recipe = findRecipe(id) || getRecipe(id);
     state.method = getMethod(state.recipe.methodId);
     state.scaled = scaleRecipe(state.recipe, selectedDose(state.recipe));
     applyTheme(state.method);
@@ -577,7 +673,11 @@
     elements.recipeCharacter.textContent = `${method.name} · ${method.family} · ${method.filterMaterial}`;
     elements.recipeTitle.textContent = recipe.title;
     elements.recipeDescription.textContent = recipe.summary;
-    elements.recipeAttribution.textContent = `${recipe.attribution.label} · v${recipe.version}`;
+    const source = recipe.parentRecipe
+      ? ` · Based on ${recipe.parentRecipe.title} v${String(recipe.parentRecipe.revisionId || '').split('@').at(-1)}`
+      : '';
+    const demoPrefix = recipe.isPersonal && state.personal.demo ? 'Staging demo · ' : '';
+    elements.recipeAttribution.textContent = `${demoPrefix}${recipe.attribution.label} · v${recipe.version}${source}`;
     elements.recipeResult.textContent = recipe.result;
     elements.recipeArt.innerHTML = methodSvg(method.id);
     elements.coffeeDose.value = recipe.coffee;
@@ -587,7 +687,9 @@
     elements.recipeGrind.textContent = recipe.grind;
     elements.recipeDuration.textContent = formatDuration(recipe.totalDuration);
     elements.recipeDifficulty.textContent = recipe.difficulty;
-    elements.recipeEquipment.textContent = `You will need: ${method.equipment}. Brewing family: ${method.family}. Filter: ${method.filterMaterial}.`;
+    elements.recipeEquipment.textContent = `You will need: ${recipe.equipment || method.equipment}. Brewing family: ${method.family}. Filter: ${method.filterMaterial}.`;
+    elements.recipePrivateNotes.hidden = !recipe.isPersonal || !recipe.notes;
+    elements.recipePrivateNotes.textContent = recipe.notes ? `Private notes: ${recipe.notes}` : '';
     elements.recipeRatioLabel.innerHTML = `Ratio${termMark('brew-ratio', 'Brew ratio')}`;
     elements.recipeWaterLabel.innerHTML = `Water${termMark('water-temperature', 'Water temperature')}`;
     elements.recipeGrindLabel.innerHTML = `Grind${termMark('grind-size', 'Grind size')}`;
@@ -620,6 +722,20 @@
     }).join('');
     elements.doseMinus.disabled = recipe.coffee <= MIN_COFFEE_GRAMS;
     elements.dosePlus.disabled = recipe.coffee >= MAX_COFFEE_GRAMS;
+    elements.recipeVariantButton.hidden = Boolean(recipe.isPersonal);
+    elements.personalRecipeActions.hidden = !recipe.isPersonal;
+    elements.personalRecipeArchive.textContent = recipe.archived ? 'Restore' : 'Archive';
+    for (const control of [elements.personalRecipeEdit, elements.personalRecipeDuplicate, elements.personalRecipeArchive, elements.personalRecipeDelete]) {
+      control.disabled = Boolean(recipe.isPersonal && state.personal.demo);
+    }
+    elements.personalRecipeDeleteConfirmation.hidden = true;
+    elements.personalRecipeDetailError.hidden = true;
+    elements.startBrew.disabled = Boolean(recipe.archived);
+    elements.startBrew.querySelector('span').textContent = recipe.archived
+      ? 'Restore to brew this recipe'
+      : 'Start guided brew';
+    elements.recipeFavoriteButton.disabled = Boolean(recipe.archived);
+    elements.recipeCollectionsButton.disabled = Boolean(recipe.archived);
     syncShelfUi();
   }
 
@@ -777,7 +893,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', ...TAG_KEYS]
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
       .forEach((key) => url.searchParams.delete(key));
   }
 
@@ -790,8 +906,24 @@
       }
     }
     if (screen === 'method') url.searchParams.set('method', id);
-    if (screen === 'recipe') url.searchParams.set('recipe', id);
-    if (screen === 'brew') url.searchParams.set('brew', id);
+    if (screen === 'recipe') {
+      url.searchParams.set('recipe', id);
+      if (state.recipe?.isPersonal && state.personal.demo) url.searchParams.set('demo', '1');
+    }
+    if (screen === 'brew') {
+      url.searchParams.set('brew', id);
+      if (state.recipe?.isPersonal && state.personal.demo) url.searchParams.set('demo', '1');
+    }
+    if (screen === 'myRecipes') {
+      url.searchParams.set('myRecipes', '1');
+      if (state.personal.view === 'archived') url.searchParams.set('view', 'archived');
+      if (state.personal.demo) url.searchParams.set('demo', '1');
+    }
+    if (screen === 'recipeForm') {
+      url.searchParams.set('recipeEditor', id || 'new');
+      if (state.personal.parentRecipeRef) url.searchParams.set('source', state.personal.parentRecipeRef);
+      if (state.personal.demo) url.searchParams.set('demo', '1');
+    }
     if (screen === 'journal') {
       url.searchParams.set('journal', state.journal.demo ? 'demo' : '1');
       if (state.journal.filters.methodId) url.searchParams.set('journalMethod', state.journal.filters.methodId);
@@ -840,6 +972,7 @@
     if (screen === 'library') renderLibrary();
     if (screen === 'brew') renderBrewShell();
     if (screen === 'glossary') renderGlossary();
+    if (screen === 'myRecipes') renderMyRecipes();
     const canonicalId = screen === 'method'
       ? state.method.id
       : (screen === 'recipe' || screen === 'brew')
@@ -857,12 +990,32 @@
   }
 
   function isKnownRecipeReference(id) {
-    return RECIPE_REVISIONS.some((recipe) => recipe.id === id || recipe.revisionId === id)
+    return Boolean(findRecipe(id))
       || METHODS.some((method) => method.id === id);
   }
 
   function parseLocation({ focus = false } = {}) {
     const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo') === '1';
+    const recipeEditor = params.get('recipeEditor');
+    if (recipeEditor) {
+      const editing = recipeEditor !== 'new' ? findPersonalRecipe(recipeEditor) : null;
+      const source = recipeEditor === 'new' ? findRecipe(params.get('source')) : null;
+      openPersonalRecipeForm({
+        recipe: editing,
+        source,
+        historyMode: null,
+        focus,
+        transition: 'none',
+      });
+      return;
+    }
+    if (params.get('myRecipes') === '1') {
+      openMyRecipes({
+        view: params.get('view'), demo, historyMode: null, focus, transition: 'none',
+      });
+      return;
+    }
     const journalMode = params.get('journal');
     const journalEntryId = params.get('entry');
     const journalEditId = params.get('edit');
@@ -893,7 +1046,7 @@
         demo: journalMode === 'demo',
         filters: {
           methodId: METHODS.some((method) => method.id === params.get('journalMethod')) ? params.get('journalMethod') : '',
-          recipeId: RECIPES.some((recipe) => recipe.id === params.get('journalRecipe')) ? params.get('journalRecipe') : '',
+          recipeId: selectableRecipes().some((recipe) => recipe.id === params.get('journalRecipe')) ? params.get('journalRecipe') : '',
           q: (params.get('journalQ') || '').slice(0, 120),
         },
         historyMode: null,
@@ -904,7 +1057,6 @@
     }
     const shelfMode = params.get('shelf');
     const collectionId = params.get('collection');
-    const demo = params.get('demo') === '1';
     if (collectionId) {
       openShelf({ view: 'collections', demo, historyMode: null, focus, transition: 'none' });
       openCollection(collectionId, { historyMode: null, focus, transition: 'none' });
@@ -1081,6 +1233,342 @@
     loadJournal();
   }
 
+  // -------------------------------------------------------------------------
+  // Private custom recipes and immutable personal revisions.
+  // -------------------------------------------------------------------------
+
+  function personalRecipesApiPath(path = '') {
+    const suffix = state.personal.demo ? '?demo=1' : '';
+    return `/api/personal-recipes${path}${suffix}`;
+  }
+
+  function replacePersonalRecipe(recipe) {
+    state.personal.recipes = [
+      recipe,
+      ...state.personal.recipes.filter((candidate) => candidate.id !== recipe.id),
+    ];
+    state.personal.loaded = true;
+    state.personal.loadedDemo = false;
+    populateJournalControls();
+  }
+
+  async function loadPersonalRecipes({ demo = state.personal.demo, quiet = false } = {}) {
+    state.personal.demo = demo;
+    if (!quiet) {
+      elements.personalRecipesStatus.textContent = 'Loading your private recipes…';
+      elements.personalRecipesError.hidden = true;
+      elements.personalRecipesEmpty.hidden = true;
+    }
+    try {
+      const payload = await apiFetch(personalRecipesApiPath());
+      state.personal.recipes = payload.recipes || [];
+      state.personal.demo = Boolean(payload.demo);
+      state.personal.loaded = true;
+      state.personal.loadedDemo = Boolean(payload.demo);
+      populateJournalControls();
+      renderMyRecipes();
+    } catch (error) {
+      state.personal.recipes = [];
+      state.personal.loaded = false;
+      elements.personalRecipesStatus.textContent = '';
+      elements.personalRecipesErrorCopy.textContent = error.message;
+      elements.personalRecipesError.hidden = false;
+      elements.personalRecipesList.hidden = true;
+      elements.personalRecipesEmpty.hidden = true;
+    }
+  }
+
+  function renderMyRecipes() {
+    const archived = state.personal.view === 'archived';
+    const recipes = state.personal.recipes.filter((recipe) => Boolean(recipe.archived) === archived);
+    elements.personalRecipesActive.setAttribute('aria-pressed', String(!archived));
+    elements.personalRecipesArchived.setAttribute('aria-pressed', String(archived));
+    elements.personalRecipesList.innerHTML = recipes.map(recipeCard).join('');
+    elements.personalRecipesList.hidden = recipes.length === 0;
+    elements.personalRecipesEmpty.hidden = recipes.length !== 0;
+    elements.personalRecipesError.hidden = true;
+    elements.personalRecipesEmptyTitle.textContent = archived
+      ? 'No archived recipes'
+      : 'No personal recipes yet';
+    elements.personalRecipesEmptyCopy.textContent = archived
+      ? 'Recipes you archive will wait here until you restore or delete them.'
+      : 'Start from scratch or open an original recipe and make your own version.';
+    elements.personalRecipesEmptyAction.textContent = archived ? 'Show active recipes' : 'Create your first recipe';
+    elements.personalRecipesStatus.textContent = state.personal.demo
+      ? 'Showing read-only staging examples. Your private recipes use the same layout.'
+      : `${recipes.length} ${archived ? 'archived' : 'active'} ${recipes.length === 1 ? 'recipe' : 'recipes'}`;
+  }
+
+  function openMyRecipes({ view = 'active', demo = state.personal.demo, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    const demoChanged = Boolean(demo) !== state.personal.loadedDemo;
+    state.personal.view = view === 'archived' ? 'archived' : 'active';
+    state.personal.demo = demo;
+    if (historyMode) history[historyMode]({ screen: 'myRecipes' }, '', urlFor('myRecipes'));
+    showScreen('myRecipes', { focus, transition });
+    if (!state.personal.loaded || demoChanged) loadPersonalRecipes({ demo });
+    else renderMyRecipes();
+  }
+
+  function scratchRecipe() {
+    const method = METHODS[0];
+    return {
+      methodId: method.id,
+      title: '',
+      summary: '',
+      result: '',
+      defaultCoffee: 15,
+      ratio: 16.67,
+      temperature: '93°C',
+      grind: 'Medium-fine',
+      difficulty: 'Approachable',
+      equipment: method.equipment,
+      tags: {
+        roast: ['light'],
+        profile: ['balanced'],
+        technique: ['percolation'],
+        experience: ['forgiving'],
+        serving: ['single-cup'],
+      },
+      steps: [
+        { label: 'Bloom', action: 'pour', duration: 45, target: 45, instruction: 'Wet every ground evenly.', preparation: 'Level the coffee bed and lift the kettle.' },
+        { label: 'Main pour', action: 'pour', duration: 60, target: 250, instruction: 'Pour with a steady, controlled flow.', preparation: 'Bring the kettle back over the brewer.' },
+        { label: 'Draw down', action: 'drain', duration: 60, target: 250, instruction: 'Let the coffee drain before serving.', preparation: 'Set the kettle down and keep the server steady.' },
+      ],
+      notes: '',
+    };
+  }
+
+  function cloneRecipeForForm(recipe) {
+    return {
+      ...recipe,
+      tags: Object.fromEntries(TAG_KEYS.map((facet) => [facet, [...recipe.tags[facet]]] )),
+      steps: recipe.steps.map((step) => ({ ...step })),
+    };
+  }
+
+  function setPersonalFormValue(name, value) {
+    const field = elements.personalRecipeForm.elements[name];
+    if (field) field.value = value ?? '';
+  }
+
+  function renderPersonalRecipeTags(tags) {
+    elements.personalRecipeTags.innerHTML = TAG_KEYS.map((facet) => {
+      const taxonomy = TAG_TAXONOMY[facet];
+      const selected = new Set(tags[facet] || []);
+      const choices = taxonomy.values.map((entry) => `
+        <label class="personal-recipe-tag-option">
+          <input type="checkbox" name="tag-${facet}" value="${entry.value}" ${selected.has(entry.value) ? 'checked' : ''}>
+          <span>${entry.label}</span>
+        </label>`).join('');
+      return `<fieldset class="personal-recipe-tag-group"><legend>${taxonomy.label}</legend><div class="personal-recipe-tag-options">${choices}</div></fieldset>`;
+    }).join('');
+  }
+
+  function stepActionOptions(selected) {
+    return Object.entries(STEP_ACTIONS).map(([value, label]) => (
+      `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`
+    )).join('');
+  }
+
+  function renderPersonalRecipeSteps() {
+    elements.personalRecipeSteps.innerHTML = state.personal.steps.map((step, index) => `
+      <li class="personal-recipe-step-editor" data-personal-step="${index}">
+        <div class="personal-recipe-step-heading">
+          <span class="personal-recipe-step-title"><span class="personal-recipe-step-number">${index + 1}</span>Step ${index + 1}</span>
+          <span class="personal-recipe-step-actions">
+            <button class="icon-button" type="button" data-step-move="up" aria-label="Move step ${index + 1} earlier" ${index === 0 ? 'disabled' : ''}>↑</button>
+            <button class="icon-button" type="button" data-step-move="down" aria-label="Move step ${index + 1} later" ${index === state.personal.steps.length - 1 ? 'disabled' : ''}>↓</button>
+            <button class="icon-button" type="button" data-step-remove aria-label="Remove step ${index + 1}" ${state.personal.steps.length === 1 ? 'disabled' : ''}>×</button>
+          </span>
+        </div>
+        <div class="personal-recipe-step-grid">
+          <label class="journal-field"><span>Step name</span><input data-step-field="label" maxlength="80" value="${escapeHtml(step.label)}" required></label>
+          <label class="journal-field"><span>Action</span><select data-step-field="action">${stepActionOptions(step.action)}</select></label>
+          <label class="journal-field"><span>Duration (seconds)</span><input data-step-field="duration" type="number" min="0" max="1800" step="1" inputmode="numeric" value="${step.duration}" required></label>
+          <label class="journal-field"><span>Cumulative water (g, optional)</span><input data-step-field="target" type="number" min="0" step="1" inputmode="numeric" value="${Number.isFinite(step.target) ? step.target : ''}"></label>
+          <label class="journal-field"><span>Prepare lead (seconds, optional)</span><input data-step-field="prepareLeadSeconds" type="number" min="10" max="300" step="1" inputmode="numeric" value="${step.prepareLeadSeconds || ''}"></label>
+          <span></span>
+          <label class="journal-field step-copy-field"><span>Instruction</span><textarea data-step-field="instruction" maxlength="500" rows="2" required>${escapeHtml(step.instruction)}</textarea></label>
+          <label class="journal-field step-copy-field"><span>Preparation cue</span><textarea data-step-field="preparation" maxlength="300" rows="2" required>${escapeHtml(step.preparation)}</textarea></label>
+        </div>
+      </li>`).join('');
+  }
+
+  function readPersonalRecipeSteps() {
+    return [...elements.personalRecipeSteps.querySelectorAll('[data-personal-step]')].map((row) => {
+      const value = (name) => row.querySelector(`[data-step-field="${name}"]`).value;
+      return {
+        label: value('label'),
+        action: value('action'),
+        duration: value('duration'),
+        target: value('target') === '' ? null : value('target'),
+        instruction: value('instruction'),
+        preparation: value('preparation'),
+        prepareLeadSeconds: value('prepareLeadSeconds') === '' ? null : value('prepareLeadSeconds'),
+      };
+    });
+  }
+
+  function updatePersonalRecipeWaterTotal() {
+    const dose = Number(elements.personalRecipeForm.elements.defaultCoffee.value);
+    const ratio = Number(elements.personalRecipeForm.elements.ratio.value);
+    const total = Number.isFinite(dose) && Number.isFinite(ratio) ? Math.round(dose * ratio) : null;
+    elements.personalRecipeWaterTotal.textContent = total
+      ? `Recipe total: ${total}g water. The final cumulative water target must also be ${total}g.`
+      : 'Set a dose and ratio to calculate the final water target.';
+  }
+
+  function fillPersonalRecipeForm(recipe) {
+    for (const field of ['title', 'methodId', 'defaultCoffee', 'ratio', 'temperature', 'grind', 'difficulty', 'equipment', 'summary', 'result', 'notes']) {
+      setPersonalFormValue(field, recipe[field]);
+    }
+    state.personal.steps = recipe.steps.map((step) => ({ ...step }));
+    renderPersonalRecipeTags(recipe.tags);
+    renderPersonalRecipeSteps();
+    updatePersonalRecipeWaterTotal();
+  }
+
+  function openPersonalRecipeForm({ recipe = null, source = null, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    const editing = Boolean(recipe?.isPersonal);
+    const base = cloneRecipeForForm(recipe || source || scratchRecipe());
+    if (!editing && source) base.title = `${source.title}, my version`.slice(0, 100);
+    state.personal.formMode = editing ? 'edit' : 'create';
+    state.personal.formRecipeId = editing ? recipe.id : null;
+    state.personal.parentRecipeRef = !editing && source ? source.revisionId : null;
+    state.personal.returnTo = source || editing ? 'recipe' : 'myRecipes';
+    elements.personalRecipeForm.reset();
+    fillPersonalRecipeForm(base);
+    elements.recipeFormKicker.textContent = editing ? `Private recipe · revision ${recipe.version}` : source ? 'Personal recipe variant' : 'New private recipe';
+    elements.recipeFormTitle.textContent = editing ? 'Edit your recipe' : source ? 'Make it your own' : 'Create a recipe';
+    elements.recipeFormIntro.textContent = editing
+      ? 'Saving creates a new revision. Past brews keep the exact recipe they used.'
+      : 'Set the dose, ratio, instructions, and cues you want beside you during a brew.';
+    const lineage = editing ? recipe.parentRecipe : source ? {
+      title: source.title, revisionId: source.revisionId, attribution: source.attribution.label,
+    } : null;
+    elements.recipeFormSource.hidden = !lineage;
+    elements.recipeFormSource.textContent = lineage
+      ? `Based on ${lineage.title} · ${lineage.revisionId} · ${lineage.attribution}`
+      : '';
+    elements.personalRecipeFormError.hidden = true;
+    elements.personalRecipeFormSave.textContent = editing ? 'Save new revision' : 'Save private recipe';
+    if (historyMode) history[historyMode]({ screen: 'recipeForm' }, '', urlFor('recipeForm', editing ? recipe.id : 'new'));
+    showScreen('recipeForm', { focus, transition });
+  }
+
+  function readPersonalRecipeForm() {
+    const form = new FormData(elements.personalRecipeForm);
+    return {
+      title: form.get('title'),
+      methodId: form.get('methodId'),
+      defaultCoffee: form.get('defaultCoffee'),
+      ratio: form.get('ratio'),
+      temperature: form.get('temperature'),
+      grind: form.get('grind'),
+      difficulty: form.get('difficulty'),
+      equipment: form.get('equipment'),
+      summary: form.get('summary'),
+      result: form.get('result'),
+      notes: form.get('notes'),
+      parentRecipeRef: state.personal.parentRecipeRef,
+      tags: Object.fromEntries(TAG_KEYS.map((facet) => [
+        facet,
+        [...elements.personalRecipeForm.querySelectorAll(`input[name="tag-${facet}"]:checked`)].map((input) => input.value),
+      ])),
+      steps: readPersonalRecipeSteps(),
+    };
+  }
+
+  async function savePersonalRecipe(event) {
+    event.preventDefault();
+    elements.personalRecipeFormError.hidden = true;
+    elements.personalRecipeFormSave.disabled = true;
+    elements.personalRecipeFormSave.textContent = 'Saving…';
+    try {
+      const editing = state.personal.formMode === 'edit';
+      const path = editing
+        ? `/api/personal-recipes/${encodeURIComponent(state.personal.formRecipeId)}`
+        : '/api/personal-recipes';
+      const payload = await apiFetch(path, {
+        method: editing ? 'PATCH' : 'POST',
+        body: JSON.stringify(readPersonalRecipeForm()),
+      });
+      state.personal.demo = false;
+      replacePersonalRecipe(payload.recipe);
+      loadShelf({ quiet: true });
+      chooseRecipe(payload.recipe.id);
+      history.replaceState({ screen: 'recipe', id: payload.recipe.id }, '', urlFor('recipe', payload.recipe.id));
+      showScreen('recipe', { transition: 'pop' });
+      if (window.unNative?.toast) window.unNative.toast(editing ? 'New recipe revision saved' : 'Private recipe saved');
+    } catch (error) {
+      elements.personalRecipeFormError.textContent = error.message;
+      elements.personalRecipeFormError.hidden = false;
+    } finally {
+      elements.personalRecipeFormSave.disabled = false;
+      elements.personalRecipeFormSave.textContent = state.personal.formMode === 'edit'
+        ? 'Save new revision' : 'Save private recipe';
+    }
+  }
+
+  async function setCurrentPersonalRecipeArchived(archived) {
+    elements.personalRecipeArchive.disabled = true;
+    elements.personalRecipeDetailError.hidden = true;
+    try {
+      const payload = await apiFetch(`/api/personal-recipes/${encodeURIComponent(state.recipe.id)}/archive`, {
+        method: 'PATCH', body: JSON.stringify({ archived }),
+      });
+      replacePersonalRecipe(payload.recipe);
+      loadShelf({ quiet: true });
+      chooseRecipe(payload.recipe.id);
+      if (window.unNative?.toast) window.unNative.toast(archived ? 'Recipe archived' : 'Recipe restored');
+    } catch (error) {
+      elements.personalRecipeDetailError.textContent = error.message;
+      elements.personalRecipeDetailError.hidden = false;
+    } finally {
+      elements.personalRecipeArchive.disabled = false;
+    }
+  }
+
+  async function duplicateCurrentPersonalRecipe() {
+    elements.personalRecipeDuplicate.disabled = true;
+    elements.personalRecipeDetailError.hidden = true;
+    try {
+      const payload = await apiFetch(`/api/personal-recipes/${encodeURIComponent(state.recipe.id)}/duplicate`, { method: 'POST' });
+      replacePersonalRecipe(payload.recipe);
+      chooseRecipe(payload.recipe.id);
+      history.pushState({ screen: 'recipe', id: payload.recipe.id }, '', urlFor('recipe', payload.recipe.id));
+      showScreen('recipe', { transition: 'push' });
+      if (window.unNative?.toast) window.unNative.toast('Private recipe duplicated');
+    } catch (error) {
+      elements.personalRecipeDetailError.textContent = error.message;
+      elements.personalRecipeDetailError.hidden = false;
+    } finally {
+      elements.personalRecipeDuplicate.disabled = false;
+    }
+  }
+
+  async function deleteCurrentPersonalRecipe() {
+    elements.personalRecipeDeleteConfirm.disabled = true;
+    elements.personalRecipeDetailError.hidden = true;
+    try {
+      const recipeId = state.recipe.id;
+      await apiFetch(`/api/personal-recipes/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+      state.personal.recipes = state.personal.recipes.filter((recipe) => recipe.id !== recipeId);
+      populateJournalControls();
+      loadShelf({ quiet: true });
+      state.personal.view = 'active';
+      history.replaceState({ screen: 'myRecipes' }, '', urlFor('myRecipes'));
+      showScreen('myRecipes', { transition: 'pop' });
+      renderMyRecipes();
+      if (window.unNative?.toast) window.unNative.toast('Personal recipe deleted');
+    } catch (error) {
+      elements.personalRecipeDetailError.textContent = error.message;
+      elements.personalRecipeDetailError.hidden = false;
+    } finally {
+      elements.personalRecipeDeleteConfirm.disabled = false;
+    }
+  }
+
 
   // -------------------------------------------------------------------------
   // Favorites and personal collections ("the shelf").
@@ -1192,7 +1680,7 @@
     await request;
     const set = favoriteIdSet();
     if (favorite) set.add(recipeId); else set.delete(recipeId);
-    const recipe = RECIPES.find((candidate) => candidate.id === recipeId);
+    const recipe = findRecipe(recipeId);
     const summary = recipe ? recipeSummaryForClient(recipe) : null;
     const list = state.shelf.favorites.filter((entry) => entry.id !== recipeId);
     if (favorite && summary) list.unshift(summary);
@@ -1451,7 +1939,7 @@
 
   function renderCollectionPicker() {
     const recipeId = state.collection.recipeId;
-    const recipe = RECIPES.find((candidate) => candidate.id === recipeId);
+    const recipe = findRecipe(recipeId);
     elements.collectionPickerRecipe.textContent = recipe ? recipe.title : '';
     if (!state.shelf.collections.length) {
       elements.collectionPickerList.innerHTML = '<p class="collection-picker-empty">You have no collections yet. Create one below and this recipe goes straight in.</p>';
@@ -1559,7 +2047,9 @@
     elements.journalDetailActions.hidden = false;
     elements.journalVersionStatus.textContent = entry.isCurrentRecipeRevision
       ? `This is the current ${snapshot.title} revision.`
-      : `You brewed revision v${entry.recipeVersion}. The current recipe is v${entry.currentRecipeVersion}; this snapshot remains unchanged.`;
+      : entry.currentRecipeVersion
+        ? `You brewed revision v${entry.recipeVersion}. The current recipe is v${entry.currentRecipeVersion}; this snapshot remains unchanged.`
+        : `The source recipe is no longer available. This brew snapshot remains unchanged.`;
     elements.journalSnapshotDetails.innerHTML = definitionRows([
       ['Coffee dose', `${snapshot.coffee}g`],
       ['Water', `${snapshot.water}g`],
@@ -1583,7 +2073,7 @@
     elements.journalDelete.hidden = state.journal.demo;
     elements.journalDeleteConfirmation.hidden = true;
     elements.journalDetailError.hidden = true;
-    const revisionAvailable = Boolean(RECIPE_REVISIONS.find((recipe) => recipe.revisionId === entry.recipeRevisionId));
+    const revisionAvailable = Boolean(entry.recipeRevisionAvailable);
     elements.journalRepeat.disabled = !revisionAvailable;
     elements.journalRepeat.textContent = revisionAvailable ? 'Brew again' : 'Revision unavailable';
   }
@@ -1655,8 +2145,13 @@
     state.journal.returnTo = 'detail';
     state.journal.entry = entry;
     elements.journalEntryForm.reset();
-    const recipe = RECIPE_REVISIONS.find((candidate) => candidate.revisionId === entry.recipeRevisionId)
-      || getRecipe(entry.recipeId);
+    const recipe = findRecipe(entry.recipeRevisionId) || {
+      ...entry.recipeSnapshot,
+      defaultCoffee: entry.recipeSnapshot.coffee,
+      baseWater: entry.recipeSnapshot.water,
+      isPersonal: Boolean(entry.recipeSnapshot.isPersonal),
+      archived: false,
+    };
     state.recipe = recipe;
     state.method = getMethod(recipe.methodId);
     state.scaled = scaleRecipe(recipe, entry.recipeSnapshot.coffee);
@@ -1742,9 +2237,21 @@
     loadJournal();
   }
 
-  function repeatJournalEntry() {
+  async function repeatJournalEntry() {
     const entry = state.journal.entry;
-    const recipe = RECIPE_REVISIONS.find((candidate) => candidate.revisionId === entry.recipeRevisionId);
+    let recipe = findRecipe(entry.recipeRevisionId);
+    if (!recipe && entry.recipeId.startsWith('personal-') && entry.recipeRevisionAvailable) {
+      try {
+        const payload = await apiFetch(`/api/personal-recipes/${encodeURIComponent(entry.recipeRevisionId)}`);
+        recipe = payload.recipe;
+        state.personal.historical = [
+          recipe,
+          ...state.personal.historical.filter((candidate) => candidate.revisionId !== recipe.revisionId),
+        ];
+      } catch {
+        recipe = null;
+      }
+    }
     if (!recipe) return;
     state.doses[recipe.id] = entry.recipeSnapshot.coffee;
     saveDoses();
@@ -1990,6 +2497,82 @@
     state.timer = freshTimer();
     navigate('brew', recipeRouteReference(state.recipe), { transition: 'push' });
   });
+  elements.myRecipesButton.addEventListener('click', () => openMyRecipes({ transition: 'push' }));
+  elements.personalRecipesList.addEventListener('click', handleRecipeCardClick);
+  elements.personalRecipesActive.addEventListener('click', () => {
+    state.personal.view = 'active';
+    history.replaceState({ screen: 'myRecipes' }, '', urlFor('myRecipes'));
+    renderMyRecipes();
+  });
+  elements.personalRecipesArchived.addEventListener('click', () => {
+    state.personal.view = 'archived';
+    history.replaceState({ screen: 'myRecipes' }, '', urlFor('myRecipes'));
+    renderMyRecipes();
+  });
+  elements.personalRecipeNew.addEventListener('click', () => openPersonalRecipeForm());
+  elements.personalRecipesEmptyAction.addEventListener('click', () => {
+    if (state.personal.view === 'archived') {
+      state.personal.view = 'active';
+      history.replaceState({ screen: 'myRecipes' }, '', urlFor('myRecipes'));
+      renderMyRecipes();
+    } else {
+      openPersonalRecipeForm();
+    }
+  });
+  elements.personalRecipesRetry.addEventListener('click', () => loadPersonalRecipes());
+  elements.recipeVariantButton.addEventListener('click', () => openPersonalRecipeForm({ source: state.recipe }));
+  elements.personalRecipeEdit.addEventListener('click', () => openPersonalRecipeForm({ recipe: state.recipe }));
+  elements.personalRecipeDuplicate.addEventListener('click', duplicateCurrentPersonalRecipe);
+  elements.personalRecipeArchive.addEventListener('click', () => setCurrentPersonalRecipeArchived(!state.recipe.archived));
+  elements.personalRecipeDelete.addEventListener('click', () => {
+    elements.personalRecipeDeleteConfirmation.hidden = false;
+    elements.personalRecipeDeleteConfirm.focus();
+  });
+  elements.personalRecipeDeleteCancel.addEventListener('click', () => {
+    elements.personalRecipeDeleteConfirmation.hidden = true;
+    elements.personalRecipeDelete.focus();
+  });
+  elements.personalRecipeDeleteConfirm.addEventListener('click', deleteCurrentPersonalRecipe);
+  elements.personalRecipeForm.addEventListener('submit', savePersonalRecipe);
+  elements.personalRecipeForm.elements.defaultCoffee.addEventListener('input', updatePersonalRecipeWaterTotal);
+  elements.personalRecipeForm.elements.ratio.addEventListener('input', updatePersonalRecipeWaterTotal);
+  elements.personalRecipeAddStep.addEventListener('click', () => {
+    state.personal.steps = readPersonalRecipeSteps();
+    state.personal.steps.push({
+      label: 'New step', action: 'wait', duration: 30, target: null,
+      instruction: 'Describe what to do during this step.',
+      preparation: 'Describe what should be ready before it begins.',
+    });
+    renderPersonalRecipeSteps();
+    elements.personalRecipeSteps.lastElementChild?.querySelector('input')?.focus({ preventScroll: true });
+  });
+  elements.personalRecipeSteps.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-personal-step]');
+    if (!row) return;
+    const index = Number(row.dataset.personalStep);
+    state.personal.steps = readPersonalRecipeSteps();
+    if (event.target.closest('[data-step-remove]')) {
+      if (state.personal.steps.length > 1) state.personal.steps.splice(index, 1);
+    } else {
+      const move = event.target.closest('[data-step-move]')?.dataset.stepMove;
+      const target = move === 'up' ? index - 1 : move === 'down' ? index + 1 : index;
+      if (target !== index && target >= 0 && target < state.personal.steps.length) {
+        const [step] = state.personal.steps.splice(index, 1);
+        state.personal.steps.splice(target, 0, step);
+      } else if (!move) {
+        return;
+      }
+    }
+    renderPersonalRecipeSteps();
+  });
+  elements.personalRecipeFormCancel.addEventListener('click', () => {
+    const reference = state.personal.formRecipeId || state.personal.parentRecipeRef;
+    if (reference && isKnownRecipeReference(reference)) {
+      navigate('recipe', reference, { replace: true, transition: 'pop' });
+    } else {
+      openMyRecipes({ historyMode: 'replaceState', transition: 'pop' });
+    }
+  });
   elements.timerToggle.addEventListener('click', toggleTimer);
   elements.previousStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex - 1));
   elements.nextStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex + 1));
@@ -2105,7 +2688,10 @@
   elements.back.addEventListener('click', () => {
     if (state.screen === 'glossary') navigate('library', null, { transition: 'pop' });
     else if (state.screen === 'brew') navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' });
+    else if (state.screen === 'recipe' && state.recipe.isPersonal) openMyRecipes({ historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'recipe') navigate('method', state.recipe.methodId, { transition: 'pop' });
+    else if (state.screen === 'myRecipes') navigate('library', null, { transition: 'pop' });
+    else if (state.screen === 'recipeForm') elements.personalRecipeFormCancel.click();
     else if (state.screen === 'journalDetail') openJournal({ demo: state.journal.demo, historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'journalForm' && state.journal.formMode === 'edit') openJournalDetail(state.journal.entry.id, { historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'journalForm' && state.journal.returnTo === 'brew') navigate('brew', recipeRouteReference(state.recipe), { replace: true, transition: 'pop' });
@@ -2254,7 +2840,17 @@
   });
 
   populateFilters();
-  populateJournalControls();
-  loadShelf({ quiet: true });
-  parseLocation();
+  (async function initializePrivateRecipes() {
+    const params = new URLSearchParams(window.location.search);
+    const demo = params.get('demo') === '1';
+    await loadPersonalRecipes({ demo, quiet: true });
+    await Promise.all([
+      loadPersonalRevision(params.get('recipe')),
+      loadPersonalRevision(params.get('brew')),
+      loadPersonalRevision(params.get('source')),
+    ]);
+    populateJournalControls();
+    loadShelf({ quiet: true });
+    parseLocation();
+  })();
 })();

@@ -2117,3 +2117,202 @@ textarea:focus-visible,
     grid-template-columns: 1fr auto;
   }
 }
+
+/* Private recipe book and editor. */
+.personal-recipes-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(100, 70, 49, 0.13);
+  background:
+    radial-gradient(circle at 88% 24%, rgba(196, 133, 88, 0.22), transparent 28%),
+    linear-gradient(135deg, #f7eee3, #efe1d2);
+  box-shadow: 0 18px 50px rgba(79, 52, 34, 0.08);
+}
+
+.personal-recipes-hero-mark {
+  position: absolute;
+  right: 1.35rem;
+  bottom: -1.25rem;
+  color: rgba(126, 77, 49, 0.13);
+  font-family: ui-serif, Georgia, serif;
+  font-size: 8rem;
+  line-height: 1;
+  transform: rotate(-8deg);
+}
+
+.personal-recipe-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  border: 1px solid rgba(90, 64, 45, 0.13);
+  border-radius: 999px;
+  padding: 0.25rem;
+  background: rgba(255, 252, 247, 0.7);
+}
+
+.personal-recipe-tabs button {
+  min-height: 2.5rem;
+  border-radius: 999px;
+  padding: 0 1rem;
+  color: #795f4d;
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.personal-recipe-tabs button[aria-pressed="true"] {
+  background: #6e4935;
+  color: #fffaf4;
+  box-shadow: 0 5px 16px rgba(70, 43, 28, 0.16);
+}
+
+.personal-recipe-card .private-badge {
+  color: #8a5a3e;
+}
+
+.personal-recipe-card[data-archived="true"] {
+  filter: saturate(0.7);
+  opacity: 0.82;
+}
+
+.personal-recipe-tag-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.personal-recipe-tag-group {
+  border: 1px solid rgba(90, 64, 45, 0.12);
+  border-radius: 1.2rem;
+  padding: 0.9rem;
+  background: rgba(255, 252, 247, 0.55);
+}
+
+.personal-recipe-tag-group legend {
+  padding: 0 0.25rem;
+  color: #6f5847;
+  font-size: 0.76rem;
+  font-weight: 780;
+}
+
+.personal-recipe-tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.personal-recipe-tag-option {
+  position: relative;
+}
+
+.personal-recipe-tag-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.personal-recipe-tag-option span {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  border: 1px solid rgba(91, 66, 49, 0.15);
+  border-radius: 999px;
+  padding: 0 0.8rem;
+  background: #fffaf4;
+  color: #705b4d;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.personal-recipe-tag-option input:checked + span {
+  border-color: color-mix(in srgb, var(--accent), white 40%);
+  background: color-mix(in srgb, var(--accent), white 86%);
+  color: #49362b;
+}
+
+.personal-recipe-tag-option input:focus-visible + span {
+  outline: 3px solid color-mix(in srgb, var(--accent), white 45%);
+  outline-offset: 2px;
+}
+
+.personal-recipe-step-list {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.personal-recipe-step-editor {
+  border: 1px solid rgba(90, 64, 45, 0.14);
+  border-radius: 1.35rem;
+  padding: 1rem;
+  background: rgba(255, 252, 247, 0.72);
+}
+
+.personal-recipe-step-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.personal-recipe-step-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.92rem;
+  font-weight: 780;
+}
+
+.personal-recipe-step-number {
+  display: inline-grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--paper-deep);
+  color: #765d4b;
+  font-size: 0.72rem;
+}
+
+.personal-recipe-step-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.personal-recipe-step-actions {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.personal-recipe-step-actions button {
+  min-width: 2.5rem;
+}
+
+@media (min-width: 640px) {
+  .personal-recipe-tag-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .personal-recipe-step-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .personal-recipe-step-grid .step-copy-field {
+    grid-column: span 3;
+  }
+}
+
+@media (max-width: 639px) {
+  #app-header .text-button {
+    padding-right: 0.28rem;
+    padding-left: 0.28rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.07em;
+  }
+
+  .personal-recipe-step-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
