@@ -1,7 +1,7 @@
 {
   "name": "Pourover Coffee",
   "icon": {
-    "emoji": "☕"
+    "emoji": "\u2615"
   },
   "secrets": [],
   "tests": [
@@ -52,10 +52,36 @@
       ]
     },
     {
+      "id": "brew.cue-settings",
+      "name": "Brew cue settings render with safe defaults",
+      "path": "/?brew=v60-bright&shot=cues",
+      "expectText": "Brew cues",
+      "expectSelector": "#cue-settings:not([hidden])",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "brew.large-timer",
+      "name": "Large-timer mode shows a high-contrast active brew",
+      "path": "/?brew=v60-bright&shot=large",
+      "expectText": "Now",
+      "expectSelector": "body.brew-large #timer-panel[data-focus=\"active\"]",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
       "id": "journal.history",
       "name": "Brew journal renders private history",
       "path": "/?journal=demo",
-      "expectText": "Staging demo: Finca El Jardín",
+      "expectText": "Staging demo: Finca El Jard\u00edn",
       "visual": true,
       "impact": [
         "public/**",
@@ -208,7 +234,7 @@
       "id": "manual.aeropress-timer",
       "name": "AeroPress timer handles an action without a water target",
       "path": "/?brew=aeropress-inverted&shot=active",
-      "expectText": "Now · Stir",
+      "expectText": "Now \u00b7 Stir",
       "expectSelector": "#timer-panel[data-focus=\"active\"]",
       "visual": true,
       "impact": [

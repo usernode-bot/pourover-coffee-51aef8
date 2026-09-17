@@ -75,6 +75,7 @@
   <script src="/recipes.js" defer></script>
   <script src="/glossary.js" defer></script>
   <script src="/adjustments.js" defer></script>
+  <script src="/brew-cues.js" defer></script>
   <script src="/offline.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
@@ -613,6 +614,55 @@
               </div>
             </section>
             <p id="timer-announcement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+  <div id="cue-settings" class="cue-settings" hidden>
+    <div class="cue-settings-head">
+      <p id="cue-settings-title" class="eyebrow">Brew cues</p>
+      <button id="cue-settings-close" class="secondary-icon-button un-touch-target" type="button" aria-label="Close brew cues">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <p class="cue-settings-note">Spoken steps, sounds, and vibration for the timer. Every cue is optional and safe defaults stay quiet.</p>
+    <p id="cue-settings-status" class="cue-settings-status" role="status" aria-live="polite" hidden></p>
+    <div class="cue-settings-grid">
+      <label class="cue-toggle"><input id="cue-voice-enabled" class="un-switch" type="checkbox"><span>Spoken steps</span></label>
+      <label class="cue-toggle"><input id="cue-voice-prepare" class="un-switch" type="checkbox"><span>Also announce preparation</span></label>
+      <label class="cue-toggle"><input id="cue-sound-enabled" class="un-switch" type="checkbox"><span>Sounds</span></label>
+      <label class="cue-toggle"><input id="cue-haptics-enabled" class="un-switch" type="checkbox"><span>Vibration</span></label>
+      <label class="cue-toggle"><input id="cue-large-display" class="un-switch" type="checkbox"><span>Large timer mode</span></label>
+    </div>
+    <div id="cue-voice-note" class="cue-availability" hidden>Voice is not supported on this device.</div>
+    <div id="cue-haptics-note" class="cue-availability" hidden>Vibration is not supported on this device.</div>
+    <div class="cue-pattern-rows">
+      <div class="cue-pattern-row">
+        <span class="cue-pattern-label">Prepare</span>
+        <label class="cue-select"><span>Sound</span><select id="cue-sound-prepare" data-cue-sound="prepare"><option value="single">Single tone</option><option value="double">Double tone</option><option value="low">Low tone</option><option value="rising">Rising</option></select></label>
+        <label class="cue-select"><span>Vibration</span><select id="cue-haptics-prepare" data-cue-haptics="prepare"><option value="single">Single</option><option value="pulse">Pulse</option><option value="short">Short</option><option value="long">Long</option></select></label>
+      </div>
+      <div class="cue-pattern-row">
+        <span class="cue-pattern-label">Step change</span>
+        <label class="cue-select"><span>Sound</span><select id="cue-sound-transition" data-cue-sound="transition"><option value="single">Single tone</option><option value="double">Double tone</option><option value="low">Low tone</option><option value="rising">Rising</option></select></label>
+        <label class="cue-select"><span>Vibration</span><select id="cue-haptics-transition" data-cue-haptics="transition"><option value="single">Single</option><option value="pulse">Pulse</option><option value="short">Short</option><option value="long">Long</option></select></label>
+      </div>
+      <div class="cue-pattern-row">
+        <span class="cue-pattern-label">Pause</span>
+        <label class="cue-select"><span>Sound</span><select id="cue-sound-pause" data-cue-sound="pause"><option value="single">Single tone</option><option value="double">Double tone</option><option value="low">Low tone</option><option value="rising">Rising</option></select></label>
+        <label class="cue-select"><span>Vibration</span><select id="cue-haptics-pause" data-cue-haptics="pause"><option value="single">Single</option><option value="pulse">Pulse</option><option value="short">Short</option><option value="long">Long</option></select></label>
+      </div>
+      <div class="cue-pattern-row">
+        <span class="cue-pattern-label">Complete</span>
+        <label class="cue-select"><span>Sound</span><select id="cue-sound-complete" data-cue-sound="complete"><option value="single">Single tone</option><option value="double">Double tone</option><option value="low">Low tone</option><option value="rising">Rising</option></select></label>
+        <label class="cue-select"><span>Vibration</span><select id="cue-haptics-complete" data-cue-haptics="complete"><option value="single">Single</option><option value="pulse">Pulse</option><option value="short">Short</option><option value="long">Long</option></select></label>
+      </div>
+    </div>
+    <div class="cue-preview-row">
+      <button id="cue-preview-prepare" class="outline-button" type="button">Preview prepare</button>
+      <button id="cue-preview-transition" class="outline-button" type="button">Preview step</button>
+      <button id="cue-preview-pause" class="outline-button" type="button">Preview pause</button>
+      <button id="cue-preview-complete" class="outline-button" type="button">Preview complete</button>
+    </div>
+    <p class="cue-hint">Hands-free: Space pauses or resumes, N advances to the next step when the timer screen is in focus.</p>
+  </div>
+
 
             <div id="step-progress" class="mt-6 flex items-center justify-center gap-2" aria-label="Brew progress"></div>
 
@@ -628,7 +678,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 7 5 5-5 5"/><path d="M5 5v14"/></svg>
               </button>
             </div>
-            <button id="reset-timer" class="mx-auto mt-5 block min-h-11 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#907a69]" type="button">Reset timer</button>
+            <div class="mx-auto mt-5 flex items-center justify-center gap-4">
+              <button id="cue-settings-toggle" class="min-h-11 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#907a69]" type="button" aria-expanded="false" aria-controls="cue-settings">Brew cues</button>
+              <button id="reset-timer" class="min-h-11 px-4 text-xs font-semibold uppercase tracking-[0.16em] text-[#907a69]" type="button">Reset timer</button>
+            </div>
           </div>
 
           <div id="brew-complete" class="completion-panel mt-4 rounded-[2rem] p-7 text-center sm:p-10" hidden>
