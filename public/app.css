@@ -723,6 +723,20 @@ textarea:focus-visible,
   border-bottom: 0;
 }
 
+.recipe-step-action {
+  display: inline-flex;
+  margin-bottom: 0.28rem;
+  border-radius: 999px;
+  padding: 0.18rem 0.42rem;
+  background: color-mix(in srgb, var(--recipe-accent, #a84f32), white 88%);
+  color: color-mix(in srgb, var(--recipe-accent, #a84f32), #2c211a 20%);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .step-index {
   display: grid;
   width: 2rem;

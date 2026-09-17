@@ -41,6 +41,9 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?glossary=1',
     '/?glossary=1&q=drawdown',
     '/?glossary=1&term=bloom',
+    '/?method=aeropress',
+    '/?recipe=aeropress-inverted',
+    '/?brew=aeropress-inverted&shot=active',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'recipe.timeline');
@@ -58,6 +61,10 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[17].visual, true);
   assert.equal(manifest.tests[17].id, 'glossary.term-panel');
   assert.match(manifest.tests[17].expectText, /gas escape/);
+  assert.equal(manifest.tests[18].expectText, '3 recipes for AeroPress');
+  assert.equal(manifest.tests[19].id, 'manual.aeropress-recipe');
+  assert.equal(manifest.tests[20].id, 'manual.aeropress-timer');
+  assert.ok(manifest.tests.slice(19, 21).every((entry) => entry.visual));
 });
 
 test('the manifest declares visual checks for the shelf screens', () => {
@@ -109,7 +116,9 @@ test('guided brewing shares one timeline and enters a protected mobile focus mod
 
   assert.match(recipes, /function getRecipeTimeline\(recipeOrId\)/);
   assert.match(source, /const timeline = getRecipeTimeline\(recipe\)/);
-  assert.match(source, /elements\.activeStepNumber\.textContent = `Now · Step/);
+  assert.match(source, /elements\.activeStepNumber\.textContent = `Now · \$\{actionLabel\(recipeStep\)\}/);
+  assert.match(source, /STEP_ACTIONS/);
+  assert.match(source, /no scale reading/);
   assert.match(source, /document\.body\.classList\.toggle\('brew-focus', active\)/);
   assert.match(source, /Exit this guided brew\? Your timer progress will be cleared\./);
   assert.match(source, /window\.addEventListener\('beforeunload'/);

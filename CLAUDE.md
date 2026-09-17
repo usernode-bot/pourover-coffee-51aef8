@@ -49,14 +49,16 @@ tables you've marked private), etc.
 ## About Pourover Coffee
 
 Pourover Coffee is a mobile-first recipe and timer companion for manual
-coffee brewing. It ships fifteen original recipes, three each for V60,
-Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
+coffee brewing. It ships twenty-four original recipes, three each for V60,
+Hario Switch, Mugen, Clever Dripper, cotton-filter brewing, Kalita Wave,
+Chemex, and AeroPress.
 
 ## App-specific conventions
 
 - Recipe water is derived from the selected coffee dose and recipe ratio,
-  rounded to the nearest gram. Every cumulative step target scales by the
-  same proportion, and the final target must equal total water.
+  rounded to the nearest gram. Numeric cumulative step targets scale by the
+  same proportion, and the final numeric target must equal total water.
+  Action-only steps omit their target instead of inventing a scale reading.
 - Recipe definitions and scaling logic live in `public/recipes.js` so the
   browser and Node unit tests exercise the same source.
 - Methods and recipes are separate records. Method ids identify brewers;
@@ -71,10 +73,11 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
   `filterRecipes` applies AND semantics across selected facets. The library
   stores those selections in query parameters, using `filterMethod` for the
   method facet so it cannot conflict with the dedicated `method` page route.
-- Each recipe step includes short `preparation` copy for the timer's upcoming
-  action card. Preparation begins 15 seconds before the step unless that step
-  sets a longer `prepareLeadSeconds` value; the final 10 seconds use the
-  strongest visible cue.
+- Each recipe step has a value from the controlled `STEP_ACTIONS` vocabulary
+  plus short `preparation` copy for the timer's upcoming action card.
+  Preparation begins 15 seconds before the step unless that step sets a longer
+  `prepareLeadSeconds` value; the final 10 seconds use the strongest visible
+  cue.
 - Journal entries are private PostgreSQL records. Keep
   `brew_journal_entries` marked `staging:private`, scope every query to the
   verified Homeroom user id, and preserve `recipe_snapshot` when editable

@@ -169,6 +169,38 @@
         "public/app.css",
         "dapp.json"
       ]
+    },
+    {
+      "name": "AeroPress method compares three recipes",
+      "path": "/?method=aeropress",
+      "expectText": "3 recipes for AeroPress",
+      "expectSelector": "#method-recipe-list [data-recipe-id=\"aeropress-standard\"]"
+    },
+    {
+      "id": "manual.aeropress-recipe",
+      "name": "AeroPress recipe shows action-aware steps",
+      "path": "/?recipe=aeropress-inverted",
+      "expectText": "Inverted sweet cup",
+      "expectSelector": "#recipe-steps .recipe-step-action",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "manual.aeropress-timer",
+      "name": "AeroPress timer handles an action without a water target",
+      "path": "/?brew=aeropress-inverted&shot=active",
+      "expectText": "Now · Stir",
+      "expectSelector": "#timer-panel[data-focus=\"active\"]",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {

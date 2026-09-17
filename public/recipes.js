@@ -10,6 +10,22 @@
   const INITIAL_RECIPE_PUBLISHED_AT = '2026-09-16';
   const TAG_KEYS = Object.freeze(['roast', 'profile', 'technique', 'experience', 'serving']);
   const FILTER_KEYS = Object.freeze(['method', ...TAG_KEYS]);
+  const STEP_ACTIONS = Object.freeze({
+    prepare: 'Prepare',
+    pour: 'Pour',
+    add: 'Add',
+    stir: 'Stir',
+    swirl: 'Swirl',
+    steep: 'Steep',
+    release: 'Release',
+    drain: 'Drain',
+    flip: 'Flip',
+    press: 'Press',
+    plunge: 'Plunge',
+    heat: 'Heat',
+    wait: 'Wait',
+    serve: 'Serve',
+  });
 
   const TAG_TAXONOMY = Object.freeze({
     roast: Object.freeze({
@@ -37,6 +53,7 @@
         { value: 'percolation', label: 'Percolation' },
         { value: 'immersion', label: 'Immersion' },
         { value: 'hybrid', label: 'Hybrid' },
+        { value: 'pressure-assisted', label: 'Pressure-assisted' },
         { value: 'single-pour', label: 'Single pour' },
         { value: 'pulse', label: 'Pulse pours' },
       ]),
@@ -68,6 +85,8 @@
       character: 'Bright and articulate',
       description: 'A responsive cone brewer for clear cups, layered sweetness, and careful pouring.',
       equipment: 'V60 02, paper filter, server, and gooseneck kettle',
+      family: 'Cone percolation',
+      filterMaterial: 'Paper',
       defaultRecipeId: 'v60-bright',
       accent: '#b95332',
       soft: '#f2d6c8',
@@ -79,6 +98,8 @@
       character: 'Sweet and adaptable',
       description: 'A valve brewer that moves easily between percolation, immersion, and hybrid cups.',
       equipment: 'Switch 03, paper filter, server, gooseneck kettle, and spoon',
+      family: 'Valve hybrid',
+      filterMaterial: 'Paper',
       defaultRecipeId: 'switch-hybrid',
       accent: '#54705a',
       soft: '#d7e2d5',
@@ -90,6 +111,8 @@
       character: 'Round and effortless',
       description: 'A low-bypass cone made for simple pours, generous texture, and repeatable daily coffee.',
       equipment: 'Mugen dripper, paper filter, server, and kettle',
+      family: 'Low-bypass percolation',
+      filterMaterial: 'Paper',
       defaultRecipeId: 'mugen-one-pour',
       accent: '#8b5d3d',
       soft: '#ead9c9',
@@ -101,6 +124,8 @@
       character: 'Full and forgiving',
       description: 'An immersion brewer with a paper-filtered finish and an easy, dependable workflow.',
       equipment: 'Clever Dripper, paper filter, cup or server, and spoon',
+      family: 'Immersion release',
+      filterMaterial: 'Paper',
       defaultRecipeId: 'clever-water-first',
       accent: '#3f6570',
       soft: '#d5e4e5',
@@ -112,9 +137,50 @@
       character: 'Silky and expressive',
       description: 'A patient cloth-filter method for rounded texture, concentrated sweetness, and slow pouring.',
       equipment: 'Cotton filter, nel frame, server, and gooseneck kettle',
+      family: 'Cloth percolation',
+      filterMaterial: 'Cotton cloth',
       defaultRecipeId: 'cotton-silky',
       accent: '#96743f',
       soft: '#ede2c5',
+    },
+    {
+      id: 'kalita',
+      name: 'Kalita Wave',
+      number: '06',
+      character: 'Balanced and steady',
+      description: 'A flat-bottom brewer with three drain holes for even extraction, approachable pulses, and rounded clarity.',
+      equipment: 'Kalita Wave 185, Wave paper filter, server, and gooseneck kettle',
+      family: 'Flat-bottom percolation',
+      filterMaterial: 'Paper',
+      defaultRecipeId: 'kalita-flat-balance',
+      accent: '#9a5b46',
+      soft: '#edd7cf',
+    },
+    {
+      id: 'chemex',
+      name: 'Chemex',
+      number: '07',
+      character: 'Clean and generous',
+      description: 'A thick-filter brewer for polished clarity, larger servings, and patient staged pours.',
+      equipment: 'Six-cup Chemex, bonded paper filter, scale, and gooseneck kettle',
+      family: 'Thick-filter percolation',
+      filterMaterial: 'Bonded paper',
+      defaultRecipeId: 'chemex-clean-two-stage',
+      accent: '#725f4c',
+      soft: '#e6ddd1',
+    },
+    {
+      id: 'aeropress',
+      name: 'AeroPress',
+      number: '08',
+      character: 'Fast and versatile',
+      description: 'An immersion brewer finished with hand pressure for compact, expressive cups in standard or inverted form.',
+      equipment: 'AeroPress, paper micro-filter, sturdy mug, paddle, and kettle',
+      family: 'Pressure-assisted immersion',
+      filterMaterial: 'Paper micro-filter',
+      defaultRecipeId: 'aeropress-standard',
+      accent: '#4e6572',
+      soft: '#d7e2e6',
     },
   ]);
 
@@ -124,11 +190,33 @@
     label: 'Pourover Coffee original',
   });
 
-  function step(label, duration, target, instruction, preparation, prepareLeadSeconds) {
+  function inferStepAction(label) {
+    const value = String(label || '').toLowerCase();
+    if (/press/.test(value)) return 'press';
+    if (/plunge/.test(value)) return 'plunge';
+    if (/flip/.test(value)) return 'flip';
+    if (/heat|preheat/.test(value)) return 'heat';
+    if (/stir|settle$|break the crust/.test(value)) return 'stir';
+    if (/swirl/.test(value)) return 'swirl';
+    if (/steep|rest/.test(value)) return 'steep';
+    if (/release|open/.test(value) && !/open pour|open bloom/.test(value)) return 'release';
+    if (/draw|drain|drops/.test(value)) return 'drain';
+    if (/add coffee|coffee first/.test(value)) return 'add';
+    if (/prepare|settle the bed|shape the bed/.test(value)) return 'prepare';
+    if (/bloom|pour|pulse|fill|finish|build|water first|center/.test(value)) return 'pour';
+    return 'wait';
+  }
+
+  function step(label, duration, target, instruction, preparation, prepareLeadOrAction, explicitAction) {
+    const prepareLeadSeconds = Number.isFinite(prepareLeadOrAction) ? prepareLeadOrAction : null;
+    const action = (typeof prepareLeadOrAction === 'string' ? prepareLeadOrAction : explicitAction)
+      || inferStepAction(label);
+    if (!STEP_ACTIONS[action]) throw new Error(`Unsupported recipe step action: ${action}`);
     return {
       label,
+      action,
       duration,
-      target,
+      ...(Number.isFinite(target) ? { target } : {}),
       instruction,
       preparation,
       ...(prepareLeadSeconds ? { prepareLeadSeconds } : {}),
@@ -350,6 +438,131 @@
         step('Concentrated finish', 80, 300, 'Finish at the center and allow the last drops to fall.', 'Steady the server and stop exactly at the final weight.'),
       ],
     }),
+    originalRecipe({
+      id: 'kalita-flat-balance', methodId: 'kalita', title: 'Flat-bed balance',
+      summary: 'Three calm additions use the Wave bed to balance sweetness, clarity, and body.',
+      result: 'Expect an even, rounded cup with clear flavor and a soft caramel finish.',
+      defaultCoffee: 20, ratio: 16, baseWater: 320, temperature: '93°C', grind: 'Medium', difficulty: 'Approachable',
+      tags: { roast: ['light', 'medium'], profile: ['balanced', 'sweet'], technique: ['percolation', 'pulse'], experience: ['forgiving'], serving: ['large-cup'] },
+      steps: [
+        step('Bloom', 40, 60, 'Wet the flat bed evenly, then give the brewer one small swirl.', 'Seat the Wave filter without flattening its ridges and level the coffee.'),
+        step('First pulse', 35, 170, 'Pour in small circles that stay inside the coffee bed.', 'Bring the kettle low over the center as the bloom settles.'),
+        step('Final pulse', 40, 320, 'Finish with a steady center-weighted pour.', 'Wait for the slurry to fall by about a third before the final pour.'),
+        step('Draw down', 55, null, 'Let the bed drain flat, then remove the brewer.', 'Set the kettle down and leave the Wave undisturbed.', 'drain'),
+      ],
+    }),
+    originalRecipe({
+      id: 'kalita-sweet-four-pulse', methodId: 'kalita', title: 'Sweet four-pulse',
+      summary: 'Four equal pulses keep the flat bed active and build layered sweetness.',
+      result: 'Expect a juicy, sweet cup with a little more texture than the balanced recipe.',
+      defaultCoffee: 18, ratio: 16.67, baseWater: 300, temperature: '94°C', grind: 'Medium-fine', difficulty: 'Precise',
+      tags: { roast: ['light'], profile: ['sweet', 'bright'], technique: ['percolation', 'pulse'], experience: ['precise'], serving: ['single-cup', 'large-cup'] },
+      steps: [
+        step('Bloom', 45, 55, 'Saturate the whole flat bed and swirl gently once.', 'Level the grounds and bring the kettle close.'),
+        step('First pulse', 30, 135, 'Pour evenly over the center two-thirds of the bed.', 'Wait until the bloom surface loses its shine.'),
+        step('Second pulse', 30, 215, 'Repeat the same low circular path and flow.', 'Keep the kettle ready as the first pulse falls.'),
+        step('Final pulse', 35, 300, 'Finish through the center and avoid the filter wall.', 'Let the slurry settle before the last measured pour.'),
+        step('Draw down', 55, null, 'Let the final water pass through without another swirl.', 'Set the kettle down and keep the server steady.', 'drain'),
+      ],
+    }),
+    originalRecipe({
+      id: 'kalita-gentle-batch', methodId: 'kalita', title: 'Gentle shared cup',
+      summary: 'A coarser four-stage recipe keeps a deeper Wave bed even for two cups.',
+      result: 'Expect mellow sweetness, moderate clarity, and enough body for a shared brew.',
+      defaultCoffee: 30, ratio: 16.67, baseWater: 500, temperature: '92°C', grind: 'Medium-coarse', difficulty: 'Forgiving',
+      tags: { roast: ['medium'], profile: ['balanced', 'full-bodied'], technique: ['percolation', 'pulse'], experience: ['forgiving'], serving: ['batch'] },
+      steps: [
+        step('Long bloom', 55, 90, 'Wet the deeper bed completely and swirl once.', 'Warm the larger server and level the coffee carefully.'),
+        step('Build the bed', 45, 230, 'Pour broadly but keep the stream away from the paper.', 'Bring the kettle low for the first larger addition.'),
+        step('Middle pour', 45, 365, 'Maintain an even water level across the flat bed.', 'Wait for the slurry to drop halfway.'),
+        step('Finish', 45, 500, 'Finish at the center with a slightly slower stream.', 'Prepare the final measured addition.'),
+        step('Draw down', 70, null, 'Let the deeper bed drain fully before serving.', 'Warm both cups while the last water drains.', 'drain'),
+      ],
+    }),
+    originalRecipe({
+      id: 'chemex-clean-two-stage', methodId: 'chemex', title: 'Clean two-stage',
+      summary: 'Two broad pours and the bonded filter produce a polished, transparent shared cup.',
+      result: 'Expect very high clarity, gentle sweetness, and a light, tea-like body.',
+      defaultCoffee: 30, ratio: 16.67, baseWater: 500, temperature: '94°C', grind: 'Medium-coarse', difficulty: 'Approachable',
+      tags: { roast: ['light', 'medium'], profile: ['high-clarity', 'balanced'], technique: ['percolation', 'pulse'], experience: ['forgiving'], serving: ['batch'] },
+      steps: [
+        step('Bloom', 50, 90, 'Wet the entire bed, then gently swirl the Chemex.', 'Place the thick filter with its three-layer side over the spout.'),
+        step('First pour', 55, 300, 'Use broad circles while keeping water off the filter wall.', 'Lift the kettle as the bloom settles and keep the stream controlled.'),
+        step('Final pour', 55, 500, 'Finish in slower circles, ending at the center.', 'Let the water level fall by half before continuing.'),
+        step('Draw down', 80, null, 'Let the thick filter finish draining, then discard it.', 'Set the kettle down and gently move the Chemex away from drafts.', 'drain'),
+      ],
+    }),
+    originalRecipe({
+      id: 'chemex-bright-pulse', methodId: 'chemex', title: 'Bright three-pulse',
+      summary: 'Three smaller additions keep a lighter coffee aromatic through the thick filter.',
+      result: 'Expect citrus-like brightness, distinct flavors, and an exceptionally clean finish.',
+      defaultCoffee: 24, ratio: 16.67, baseWater: 400, temperature: '95°C', grind: 'Medium', difficulty: 'Precise',
+      tags: { roast: ['light'], profile: ['bright', 'high-clarity'], technique: ['percolation', 'pulse'], experience: ['precise'], serving: ['large-cup'] },
+      steps: [
+        step('Bloom', 50, 75, 'Saturate the bed and swirl until no dry pockets remain.', 'Rinse the bonded filter thoroughly and level the coffee.'),
+        step('First pulse', 40, 185, 'Pour in deliberate circles across the coffee bed.', 'Bring the kettle close as the bloom opens.'),
+        step('Second pulse', 40, 295, 'Repeat the same path without touching the paper.', 'Wait for the slurry to fall by one-third.'),
+        step('Final pulse', 40, 400, 'Finish at the center with a lower stream.', 'Prepare a slightly slower final addition.'),
+        step('Draw down', 75, null, 'Let the filter drain without swirling again.', 'Set the kettle down and leave the bed undisturbed.', 'drain'),
+      ],
+    }),
+    originalRecipe({
+      id: 'chemex-shared-table', methodId: 'chemex', title: 'Shared table',
+      summary: 'A patient staged batch keeps a large Chemex brew sweet and even for several cups.',
+      result: 'Expect a generous, balanced batch with cocoa sweetness and clean structure.',
+      defaultCoffee: 42, ratio: 16.67, baseWater: 700, temperature: '93°C', grind: 'Coarse', difficulty: 'Precise',
+      tags: { roast: ['medium'], profile: ['balanced', 'sweet'], technique: ['percolation', 'pulse'], experience: ['precise'], serving: ['batch'] },
+      steps: [
+        step('Long bloom', 60, 125, 'Wet the deep bed completely and swirl the vessel once.', 'Preheat the Chemex and make sure the filter does not seal the spout.'),
+        step('Build the bed', 60, 320, 'Pour broadly to lift the full bed without flooding it.', 'Use both hands to steady the larger brew.'),
+        step('Middle pour', 55, 510, 'Keep the slurry height steady with a controlled spiral.', 'Wait for the water level to fall by one-third.'),
+        step('Finish', 55, 700, 'Finish slowly through the center.', 'Prepare the final pour and warm the serving cups.'),
+        step('Draw down', 100, null, 'Let the thick filter drain fully, then swirl the brewed coffee.', 'Set the kettle down and keep the spout vent clear.', 'drain'),
+      ],
+    }),
+    originalRecipe({
+      id: 'aeropress-standard', methodId: 'aeropress', title: 'Classic standard press',
+      summary: 'A straightforward upright steep and press for a balanced everyday cup.',
+      result: 'Expect rounded sweetness, a clean finish, and more body than a drip brew.',
+      defaultCoffee: 15, ratio: 16, baseWater: 240, temperature: '90°C', grind: 'Medium-fine', difficulty: 'Easy',
+      tags: { roast: ['medium'], profile: ['balanced', 'sweet'], technique: ['immersion', 'pressure-assisted'], experience: ['quick', 'forgiving'], serving: ['single-cup'] },
+      steps: [
+        step('Heat and rinse', 10, null, 'Rinse the filter and warm the chamber and mug.', 'Set the AeroPress upright on a sturdy mug.', 'heat'),
+        step('Fill', 20, 240, 'Add all the water, making sure every ground is wet.', 'Have the kettle ready over the open chamber.', 'pour'),
+        step('Stir', 10, null, 'Stir front to back five times, then insert the plunger slightly.', 'Pick up the paddle before the fill ends.', 'stir'),
+        step('Steep', 60, null, 'Let the coffee steep with the plunger creating a gentle seal.', 'Set the paddle down and keep the mug stable.', 'steep'),
+        step('Press', 30, null, 'Press slowly and evenly, stopping at the first hiss.', 'Place both hands securely and keep your weight centered.', 20, 'press'),
+      ],
+    }),
+    originalRecipe({
+      id: 'aeropress-inverted', methodId: 'aeropress', title: 'Inverted sweet cup',
+      summary: 'An inverted steep gives full immersion before a careful flip and press.',
+      result: 'Expect a syrupier, sweeter cup with a long finish and minimal early drip-through.',
+      defaultCoffee: 18, ratio: 12.22, baseWater: 220, temperature: '88°C', grind: 'Medium', difficulty: 'Experimental',
+      tags: { roast: ['medium', 'dark'], profile: ['sweet', 'full-bodied'], technique: ['immersion', 'pressure-assisted'], experience: ['experimental'], serving: ['single-cup'] },
+      steps: [
+        step('Assemble inverted', 10, null, 'Insert the plunger just past the seal and stand the chamber upside down.', 'Use a stable, dry surface and keep the filter cap nearby.', 'prepare'),
+        step('Fill', 25, 220, 'Add all the water to the inverted chamber.', 'Bring the kettle close and keep one hand on the chamber.', 'pour'),
+        step('Stir', 10, null, 'Stir gently five times and attach the rinsed filter cap.', 'Have the paddle and prepared cap within reach.', 'stir'),
+        step('Steep', 65, null, 'Let the coffee rest without further agitation.', 'Set the paddle down and keep the chamber stable.', 'steep'),
+        step('Flip', 10, null, 'Hold chamber and plunger together, flip onto the mug, and settle it squarely.', 'Grip both parts firmly and position the mug close.', 20, 'flip'),
+        step('Press', 30, null, 'Press with steady pressure and stop at the hiss.', 'Center both hands over the plunger.', 20, 'press'),
+      ],
+    }),
+    originalRecipe({
+      id: 'aeropress-fast-bright', methodId: 'aeropress', title: 'Fast bright press',
+      summary: 'A hot, short steep and gentle press keep a lighter coffee lively and clear.',
+      result: 'Expect bright fruit, a lighter body, and a crisp finish in under two minutes.',
+      defaultCoffee: 14, ratio: 15.71, baseWater: 220, temperature: '94°C', grind: 'Fine', difficulty: 'Precise',
+      tags: { roast: ['light'], profile: ['bright', 'high-clarity'], technique: ['immersion', 'pressure-assisted'], experience: ['quick', 'precise'], serving: ['single-cup'] },
+      steps: [
+        step('Bloom', 20, 50, 'Add the first water and stir once to release trapped gas.', 'Set the AeroPress upright on a sturdy mug.'),
+        step('Fill', 20, 220, 'Add the remaining water quickly and evenly.', 'Keep the kettle close for an immediate fill.', 'pour'),
+        step('Swirl', 8, null, 'Insert the plunger slightly and swirl the chamber once.', 'Set the kettle down and grip the chamber.', 'swirl'),
+        step('Short steep', 35, null, 'Let the coffee rest under the plunger seal.', 'Keep the mug steady and prepare to press.', 'steep'),
+        step('Press', 25, null, 'Press gently and stop as soon as air reaches the filter.', 'Place both hands over the plunger for an even finish.', 15, 'press'),
+      ],
+    }),
   ]);
 
   const RECIPES = Object.freeze(Array.from(RECIPE_REVISIONS.reduce((latest, recipe) => {
@@ -430,10 +643,15 @@
       : recipeOrId;
     const coffee = clampCoffee(coffeeValue);
     const water = Math.round(coffee * recipe.ratio);
+    const numericTargetIndexes = recipe.steps
+      .map((recipeStep, index) => (Number.isFinite(recipeStep.target) ? index : -1))
+      .filter((index) => index >= 0);
+    const finalTargetIndex = numericTargetIndexes.at(-1);
     let previousTarget = 0;
     const steps = recipe.steps.map((recipeStep, index) => {
+      if (!Number.isFinite(recipeStep.target)) return { ...recipeStep };
       const proportional = Math.round(water * (recipeStep.target / recipe.baseWater));
-      const target = index === recipe.steps.length - 1
+      const target = index === finalTargetIndex
         ? water
         : Math.max(previousTarget, Math.min(water, proportional));
       previousTarget = target;
@@ -495,8 +713,9 @@
     let previousTarget = 0;
     const steps = recipe.steps.map((recipeStep, index) => {
       const duration = Math.max(0, Number(recipeStep.duration) || 0);
-      const target = Math.max(0, Number(recipeStep.target) || 0);
-      const targetDelta = Math.max(0, target - previousTarget);
+      const hasTarget = Number.isFinite(recipeStep.target);
+      const target = hasTarget ? Math.max(0, recipeStep.target) : null;
+      const targetDelta = hasTarget ? Math.max(0, target - previousTarget) : 0;
       const timelineStep = {
         ...recipeStep,
         index,
@@ -504,12 +723,12 @@
         target,
         previousTarget,
         targetDelta,
-        targetKind: targetDelta > 0 ? 'action' : target > 0 ? 'context' : 'none',
+        targetKind: !hasTarget ? 'none' : targetDelta > 0 ? 'action' : target > 0 ? 'context' : 'none',
         startsAt,
         endsAt: startsAt + duration,
       };
       startsAt = timelineStep.endsAt;
-      previousTarget = target;
+      if (hasTarget) previousTarget = target;
       return timelineStep;
     });
     return { steps, totalDuration: startsAt };
@@ -560,7 +779,7 @@
   return {
     DEFAULT_PREPARATION_LEAD_SECONDS, FILTER_KEYS, IMMINENT_PREPARATION_SECONDS,
     MAX_COFFEE_GRAMS, METHODS, MIN_COFFEE_GRAMS, RECIPES, RECIPE_REVISIONS,
-    TAG_KEYS, TAG_TAXONOMY,
+    STEP_ACTIONS, TAG_KEYS, TAG_TAXONOMY,
     clampCoffee, createRecipeSnapshot, filterRecipes, formatDuration, getBrewTiming,
     getMethod, getPreparationLead, getRecipe, getRecipeRevision, getRecipesForMethod,
     getRecipeTimeline, getStepStart, getTagLabel, isCurrentRecipeRevision, normalizeFilters,
