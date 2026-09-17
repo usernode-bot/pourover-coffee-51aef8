@@ -493,6 +493,21 @@
     return recipe.steps.slice(0, safeIndex).reduce((sum, recipeStep) => sum + recipeStep.duration, 0);
   }
 
+  function buildStepTimeline(recipeOrId) {
+    const recipe = typeof recipeOrId === 'string' ? getRecipe(recipeOrId) : recipeOrId;
+    let elapsed = 0;
+    let valid = true;
+    const steps = recipe.steps.map((recipeStep, index) => {
+      const startsAt = elapsed;
+      const duration = Math.max(0, Math.round(Number(recipeStep.duration) || 0));
+      const endsAt = startsAt + duration;
+      elapsed = endsAt;
+      if (Number(recipeStep.duration) !== duration) valid = false;
+      return { startsAt, endsAt, duration };
+    });
+    return { steps, totalDuration: elapsed, valid };
+  }
+
   function getBrewTiming(recipeOrId, elapsedValue) {
     const recipe = typeof recipeOrId === 'string' ? getRecipe(recipeOrId) : recipeOrId;
     const totalDuration = recipe.totalDuration || recipe.steps.reduce((sum, recipeStep) => sum + recipeStep.duration, 0);
@@ -528,11 +543,28 @@
     return `${minutes}:${String(remainder).padStart(2, '0')}`;
   }
 
+  function formatStepTiming(recipeOrId, index) {
+    const recipe = typeof recipeOrId === 'string' ? getRecipe(recipeOrId) : recipeOrId;
+    const safeIndex = Math.max(0, Math.min(recipe.steps.length - 1, Number(index) || 0));
+    const recipeStep = recipe.steps[safeIndex];
+    const startsAt = getStepStart(recipe, safeIndex);
+    const endsAt = startsAt + recipeStep.duration;
+    if (recipeStep.duration === 0) {
+      return { primary: `Start at ${formatDuration(startsAt)}`, secondary: null, startsAt, endsAt };
+    }
+    return {
+      primary: `${formatDuration(startsAt)}–${formatDuration(endsAt)}`,
+      secondary: `${formatDuration(recipeStep.duration)} long`,
+      startsAt,
+      endsAt,
+    };
+  }
+
   return {
     DEFAULT_PREPARATION_LEAD_SECONDS, FILTER_KEYS, IMMINENT_PREPARATION_SECONDS,
     MAX_COFFEE_GRAMS, METHODS, MIN_COFFEE_GRAMS, RECIPES, RECIPE_REVISIONS,
     TAG_KEYS, TAG_TAXONOMY,
-    clampCoffee, createRecipeSnapshot, filterRecipes, formatDuration, getBrewTiming,
+    buildStepTimeline, clampCoffee, createRecipeSnapshot, filterRecipes, formatDuration, formatStepTiming, getBrewTiming,
     getMethod, getPreparationLead, getRecipe, getRecipeRevision, getRecipesForMethod,
     getStepStart, getTagLabel, isCurrentRecipeRevision, normalizeFilters,
     resolveRecipeId, scaleRecipe,

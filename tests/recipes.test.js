@@ -11,9 +11,11 @@ const {
   RECIPE_REVISIONS,
   TAG_KEYS,
   TAG_TAXONOMY,
+  buildStepTimeline,
   clampCoffee,
   createRecipeSnapshot,
   filterRecipes,
+  formatStepTiming,
   getBrewTiming,
   getPreparationLead,
   getRecipe,
@@ -128,6 +130,34 @@ test('brew timing retains next-step boundaries for an exact recipe', () => {
   assert.equal(timing.isPreparing, true);
   assert.equal(timing.isImminent, false);
   assert.equal(scaled.steps[timing.nextStepIndex].target, 300);
+});
+
+test('cumulative timeline boundaries start at zero and stay ordered', () => {
+  const timeline = buildStepTimeline('v60-bright');
+  assert.equal(timeline.valid, true);
+  assert.equal(timeline.totalDuration, 180);
+  assert.deepEqual(timeline.steps.map((entry) => entry.startsAt), [0, 45, 80, 115]);
+  assert.deepEqual(timeline.steps.map((entry) => entry.endsAt), [45, 80, 115, 180]);
+  for (let index = 1; index < timeline.steps.length; index += 1) {
+    assert.ok(timeline.steps[index].startsAt >= timeline.steps[index - 1].endsAt, index);
+  }
+});
+
+test('timeline boundaries stay deterministic when the dose is scaled', () => {
+  const base = buildStepTimeline('v60-bright');
+  const scaled = buildStepTimeline(scaleRecipe('v60-bright', 30));
+  assert.deepEqual(scaled.steps, base.steps, 'durations do not change with dose');
+  assert.equal(scaled.totalDuration, base.totalDuration);
+});
+
+test('step timing shows cumulative boundaries with duration as secondary', () => {
+  const timing = formatStepTiming('v60-bright', 0);
+  assert.equal(timing.primary, '0:00–0:45');
+  assert.equal(timing.secondary, '0:45 long');
+
+  const final = formatStepTiming('v60-bright', 3);
+  assert.equal(final.primary, '1:55–3:00');
+  assert.equal(final.endsAt, buildStepTimeline('v60-bright').totalDuration);
 });
 
 test('the final ten seconds and recipe lead-time overrides remain deterministic', () => {

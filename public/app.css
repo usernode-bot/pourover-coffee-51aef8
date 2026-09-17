@@ -743,6 +743,14 @@ textarea:focus-visible,
   white-space: nowrap;
 }
 
+.step-duration {
+  display: block;
+  margin-top: 0.15rem;
+  color: #8a7666;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
 .primary-button,
 .outline-button {
   display: inline-flex;

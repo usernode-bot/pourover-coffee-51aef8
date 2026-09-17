@@ -13,6 +13,7 @@
     clampCoffee,
     filterRecipes,
     formatDuration,
+    formatStepTiming,
     getBrewTiming,
     getMethod,
     getRecipe,
@@ -100,6 +101,7 @@
     timerTotal: document.getElementById('timer-total'),
     activeStepNumber: document.getElementById('active-step-number'),
     activeStepLabel: document.getElementById('active-step-label'),
+    activeStepTiming: document.getElementById('active-step-timing'),
     activeWaterTarget: document.getElementById('active-water-target'),
     activeStepInstruction: document.getElementById('active-step-instruction'),
     nextStepPreview: document.getElementById('next-step-preview'),
@@ -558,6 +560,7 @@
     elements.recipeSteps.innerHTML = recipe.steps.map((recipeStep, index) => {
       const stepTerm = getGlossaryTermForStep(recipeStep.label);
       const label = stepTerm ? termTrigger(stepTerm.id, recipeStep.label) : escapeHtml(recipeStep.label);
+      const timing = formatStepTiming(recipe, index);
       return `
       <li class="recipe-step">
         <span class="step-index">${index + 1}</span>
@@ -565,7 +568,7 @@
           <span class="recipe-step-label block text-sm font-semibold">${label}</span>
           <span class="mt-1 block text-xs leading-5 text-[#806d5e]">${escapeHtml(recipeStep.instruction)}</span>
         </span>
-        <span class="step-target">${recipeStep.target ? `${recipeStep.target}g` : 'Prep'} · ${formatDuration(recipeStep.duration)}</span>
+        <span class="step-target">${recipeStep.target ? `${recipeStep.target}g` : 'Prep'} · ${timing.primary}<span class="step-duration">${timing.secondary}</span></span>
       </li>`;
     }).join('');
     elements.doseMinus.disabled = recipe.coffee <= MIN_COFFEE_GRAMS;
@@ -1764,13 +1767,16 @@
     elements.activeStepInstruction.textContent = recipeStep.instruction;
     elements.previousStep.disabled = stepIndex === 0 && elapsed <= 0;
     renderNextStep(timing);
+    const activeTiming = formatStepTiming(state.scaled, stepIndex);
+    elements.activeStepTiming.textContent = activeTiming.primary;
+    const target = recipeStep.target ? `Water target ${recipeStep.target} grams.` : '';
+    elements.activeStepTiming.setAttribute('aria-label', `${recipeStep.label} runs from ${formatDuration(activeTiming.startsAt)} to ${formatDuration(activeTiming.endsAt)}. ${target}`);
     // The visible step block is no longer an aria-live region (it now holds the
     // definition button), so announce step changes through the dedicated
     // announcer that the upcoming-step preview already uses. This fires for
     // the first step when the brew starts and on every later transition.
     if ((state.timer.running || state.timer.started) && state.lastRenderedStep !== stepIndex) {
-      const target = recipeStep.target ? ` Water target ${recipeStep.target} grams.` : '';
-      elements.timerAnnouncement.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}. ${recipeStep.label}.${target}`;
+      elements.timerAnnouncement.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}. ${recipeStep.label}. ${activeTiming.primary}. ${target}`;
     }
     state.lastRenderedStep = stepIndex;
     elements.stepProgress.querySelectorAll('[data-step-dot]').forEach((dot, index) => {

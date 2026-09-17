@@ -26,6 +26,24 @@
       "expectText": "Pourover Coffee original"
     },
     {
+      "id": "recipe.timeline",
+      "name": "Recipe detail shows cumulative step timeline",
+      "path": "/?recipe=v60-bright",
+      "expectText": "0:00–0:45",
+      "visual": true,
+      "impact": [
+        "public/app.js",
+        "public/recipes.js",
+        "public/app.css",
+        "dapp.json"
+      ]
+    },
+    {
+      "name": "Guided timer shows the active step boundary",
+      "path": "/?brew=v60-bright&shot=active",
+      "expectText": "0:45–1:20"
+    },
+    {
       "id": "brew.guided-timer",
       "name": "Guided timer renders an active brew",
       "path": "/?brew=v60-bright&shot=active",
