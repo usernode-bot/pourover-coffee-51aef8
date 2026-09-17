@@ -17,6 +17,7 @@
     getMethod,
     getRecipe,
     getRecipeRevision,
+    getRecipeTimeline,
     getRecipesForMethod,
     getStepStart,
     getTagLabel,
@@ -100,6 +101,7 @@
     timerTotal: document.getElementById('timer-total'),
     activeStepNumber: document.getElementById('active-step-number'),
     activeStepLabel: document.getElementById('active-step-label'),
+    activeTargetLabel: document.querySelector('#active-water-target')?.previousElementSibling,
     activeWaterTarget: document.getElementById('active-water-target'),
     activeStepInstruction: document.getElementById('active-step-instruction'),
     nextStepPreview: document.getElementById('next-step-preview'),
@@ -108,6 +110,7 @@
     nextStepLabel: document.getElementById('next-step-label'),
     nextStepPreparation: document.getElementById('next-step-preparation'),
     nextStepTargetWrap: document.getElementById('next-step-target-wrap'),
+    nextStepTargetLabel: document.querySelector('#next-step-target-wrap span'),
     nextStepTarget: document.getElementById('next-step-target'),
     timerAnnouncement: document.getElementById('timer-announcement'),
     stepProgress: document.getElementById('step-progress'),
@@ -527,9 +530,26 @@
     elements.timerPanel.style.setProperty('--recipe-accent', method.accent);
   }
 
+  function targetPresentation(timelineStep) {
+    if (timelineStep.targetKind === 'action') {
+      return { label: 'Pour to', value: `${timelineStep.target}g` };
+    }
+    if (timelineStep.targetKind === 'context') {
+      return { label: 'Water so far', value: `${timelineStep.target}g` };
+    }
+    return null;
+  }
+
+  function stepSchedule(timelineStep) {
+    const start = `Start at ${formatDuration(timelineStep.startsAt)}`;
+    if (timelineStep.duration === 0) return start;
+    return `${start} · until ${formatDuration(timelineStep.endsAt)}`;
+  }
+
   function renderRecipe() {
     const recipe = state.scaled;
     const method = state.method;
+    const timeline = getRecipeTimeline(recipe);
     elements.recipeCharacter.textContent = `${method.name} · ${method.character}`;
     elements.recipeTitle.textContent = recipe.title;
     elements.recipeDescription.textContent = recipe.summary;
@@ -555,17 +575,20 @@
       return `<div class="recipe-tag-group"><dt>${escapeHtml(TAG_TAXONOMY[facet].label)}</dt><dd>${values}</dd></div>`;
     }).join('');
     elements.stepCount.textContent = `${recipe.steps.length} steps`;
-    elements.recipeSteps.innerHTML = recipe.steps.map((recipeStep, index) => {
+    elements.recipeSteps.innerHTML = timeline.steps.map((recipeStep, index) => {
       const stepTerm = getGlossaryTermForStep(recipeStep.label);
       const label = stepTerm ? termTrigger(stepTerm.id, recipeStep.label) : escapeHtml(recipeStep.label);
+      const target = targetPresentation(recipeStep);
+      const targetCopy = target ? `${target.label} ${target.value}` : 'No water target';
       return `
       <li class="recipe-step">
         <span class="step-index">${index + 1}</span>
         <span>
           <span class="recipe-step-label block text-sm font-semibold">${label}</span>
+          <span class="recipe-step-timing tabular-nums">${stepSchedule(recipeStep)}</span>
           <span class="mt-1 block text-xs leading-5 text-[#806d5e]">${escapeHtml(recipeStep.instruction)}</span>
         </span>
-        <span class="step-target">${recipeStep.target ? `${recipeStep.target}g` : 'Prep'} · ${formatDuration(recipeStep.duration)}</span>
+        <span class="step-target"><strong>${targetCopy}</strong><span>${formatDuration(recipeStep.duration)} step</span></span>
       </li>`;
     }).join('');
     elements.doseMinus.disabled = recipe.coffee <= MIN_COFFEE_GRAMS;
@@ -681,6 +704,31 @@
     navigate('glossary', null, { transition: 'push' });
   }
 
+  function isBrewInProgress() {
+    return state.screen === 'brew' && state.timer.started && !state.timer.completed;
+  }
+
+  function syncBrewFocus() {
+    const active = isBrewInProgress();
+    document.body.classList.toggle('brew-focus', active);
+    elements.timerPanel.dataset.focus = active ? 'active' : 'ready';
+    elements.back.dataset.mode = active ? 'exit-brew' : 'back';
+    elements.back.setAttribute('aria-label', active ? 'Exit guided brew' : 'Go back');
+  }
+
+  function abandonBrewProgress() {
+    cancelTimerTick();
+    state.timer = freshTimer();
+    syncBrewFocus();
+  }
+
+  function confirmBrewExit() {
+    if (!isBrewInProgress()) return true;
+    const leave = window.confirm('Exit this guided brew? Your timer progress will be cleared.');
+    if (leave) abandonBrewProgress();
+    return leave;
+  }
+
   function showScreen(screen, { focus = true, transition = 'none' } = {}) {
     const mutate = () => {
       Object.entries(screens).forEach(([name, section]) => {
@@ -690,6 +738,7 @@
       });
       state.screen = screen;
       elements.back.hidden = screen === 'library';
+      syncBrewFocus();
       window.scrollTo({ top: 0, behavior: 'instant' });
       if (focus) screens[screen].querySelector('h1')?.focus({ preventScroll: true });
     };
@@ -758,6 +807,7 @@
   }
 
   function navigate(screen, id, { replace = false, focus = true, transition = 'push', shot } = {}) {
+    if (screen !== 'brew' && !confirmBrewExit()) return false;
     if (screen === 'method') chooseMethod(id);
     if (screen === 'recipe' || screen === 'brew') chooseRecipe(id);
     if (screen === 'library') renderLibrary();
@@ -770,6 +820,7 @@
         : id;
     history[replace ? 'replaceState' : 'pushState']({ screen, id: canonicalId }, '', urlFor(screen, canonicalId, shot));
     showScreen(screen, { focus, transition });
+    return true;
   }
 
   function filtersFromLocation(params) {
@@ -1707,7 +1758,7 @@
     elements.brewDose.textContent = `${state.scaled.coffee}g coffee · ${state.scaled.water}g water`;
     elements.brewRatio.textContent = `1:${formatRatio(state.scaled.ratio)} · ${state.scaled.temperature}`;
     elements.timerTotal.textContent = `of ${formatDuration(state.scaled.totalDuration)}`;
-    elements.stepProgress.innerHTML = state.scaled.steps.map((recipeStep, index) => (
+    elements.stepProgress.innerHTML = getRecipeTimeline(state.scaled).steps.map((recipeStep, index) => (
       `<span class="progress-dot" data-step-dot="${index}" data-state="upcoming" title="${recipeStep.label}"></span>`
     )).join('');
     renderTimer();
@@ -1723,16 +1774,21 @@
       elements.nextStepTargetWrap.hidden = true;
       return;
     }
-    const nextRecipeStep = state.scaled.steps[timing.nextStepIndex];
+    const nextRecipeStep = timing.nextStep;
+    const target = targetPresentation(nextRecipeStep);
     elements.nextStepPreview.dataset.state = timing.isImminent ? 'imminent' : timing.isPreparing ? 'preparing' : 'upcoming';
     elements.nextStepKicker.textContent = timing.isImminent ? 'Get ready' : timing.isPreparing ? 'Prepare' : 'Up next';
     elements.nextStepTiming.textContent = `in ${formatDuration(Math.ceil(timing.secondsUntilNext))} · starts at ${formatDuration(timing.nextStartsAt)}`;
     renderNextStepLabel(nextRecipeStep.label);
     elements.nextStepPreparation.textContent = nextRecipeStep.preparation;
-    elements.nextStepTargetWrap.hidden = false;
-    elements.nextStepTarget.textContent = `${nextRecipeStep.target}g`;
+    elements.nextStepTargetWrap.hidden = !target;
+    if (target) {
+      elements.nextStepTargetLabel.textContent = target.label;
+      elements.nextStepTarget.textContent = target.value;
+    }
     if (state.timer.running && timing.isPreparing && state.lastPreparationAnnouncementStep !== timing.nextStepIndex) {
-      elements.timerAnnouncement.textContent = `Prepare for ${nextRecipeStep.label} in ${Math.ceil(timing.secondsUntilNext)} seconds. Water target ${nextRecipeStep.target} grams.`;
+      const targetAnnouncement = target ? ` ${target.label} ${nextRecipeStep.target} grams.` : '';
+      elements.timerAnnouncement.textContent = `Prepare for ${nextRecipeStep.label} in ${Math.ceil(timing.secondsUntilNext)} seconds.${targetAnnouncement}`;
       state.lastPreparationAnnouncementStep = timing.nextStepIndex;
     }
     if (state.timer.running && timing.isImminent && state.lastPreparationHapticStep !== timing.nextStepIndex) {
@@ -1751,16 +1807,23 @@
     }
     elements.timerPanel.hidden = state.timer.completed;
     elements.brewComplete.hidden = !state.timer.completed;
+    syncBrewFocus();
     if (state.timer.completed) return;
     const timing = getBrewTiming(state.scaled, elapsed);
     const { stepIndex } = timing;
-    const recipeStep = state.scaled.steps[stepIndex];
+    const recipeStep = timing.currentStep;
+    const target = targetPresentation(recipeStep);
     elements.timerRing.style.setProperty('--progress', `${Math.min(1, elapsed / state.scaled.totalDuration) * 360}deg`);
     elements.timerClock.textContent = formatDuration(Math.floor(elapsed));
     elements.timerStepKicker.textContent = state.timer.running ? 'Brewing' : state.timer.started ? 'Paused' : 'Ready';
-    elements.activeStepNumber.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}`;
+    elements.timerPanel.dataset.timerState = state.timer.running ? 'running' : state.timer.started ? 'paused' : 'ready';
+    elements.activeStepNumber.textContent = `Now · Step ${stepIndex + 1} of ${state.scaled.steps.length} · ${formatDuration(recipeStep.startsAt)} to ${formatDuration(recipeStep.endsAt)}`;
     renderActiveStepLabel(recipeStep.label);
-    elements.activeWaterTarget.textContent = recipeStep.target ? `${recipeStep.target}g` : 'Prep';
+    elements.activeWaterTarget.parentElement.hidden = !target;
+    if (target) {
+      elements.activeTargetLabel.textContent = target.label;
+      elements.activeWaterTarget.textContent = target.value;
+    }
     elements.activeStepInstruction.textContent = recipeStep.instruction;
     elements.previousStep.disabled = stepIndex === 0 && elapsed <= 0;
     renderNextStep(timing);
@@ -1769,8 +1832,8 @@
     // announcer that the upcoming-step preview already uses. This fires for
     // the first step when the brew starts and on every later transition.
     if ((state.timer.running || state.timer.started) && state.lastRenderedStep !== stepIndex) {
-      const target = recipeStep.target ? ` Water target ${recipeStep.target} grams.` : '';
-      elements.timerAnnouncement.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}. ${recipeStep.label}.${target}`;
+      const targetAnnouncement = target ? ` ${target.label} ${recipeStep.target} grams.` : '';
+      elements.timerAnnouncement.textContent = `Step ${stepIndex + 1} of ${state.scaled.steps.length}. ${recipeStep.label}.${targetAnnouncement}`;
     }
     state.lastRenderedStep = stepIndex;
     elements.stepProgress.querySelectorAll('[data-step-dot]').forEach((dot, index) => {
@@ -2023,8 +2086,20 @@
   });
 
   window.addEventListener('popstate', () => {
+    if (isBrewInProgress()) {
+      const brewUrl = urlFor('brew', recipeRouteReference(state.recipe));
+      history.pushState({ screen: 'brew', id: recipeRouteReference(state.recipe) }, '', brewUrl);
+      if (!confirmBrewExit()) return;
+      history.back();
+      return;
+    }
     closeTerm({ restoreFocus: false });
     parseLocation({ focus: true });
+  });
+  window.addEventListener('beforeunload', (event) => {
+    if (state.screen !== 'brew' || !state.timer.running || state.timer.completed) return;
+    event.preventDefault();
+    event.returnValue = '';
   });
   window.addEventListener('pagehide', cancelTimerTick);
 

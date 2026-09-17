@@ -27,6 +27,7 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?method=v60',
     '/?filterMethod=v60&roast=light&profile=sweet',
     '/?recipe=v60-bright',
+    '/?recipe=clever-water-first&shot=timeline',
     '/?brew=v60-bright&shot=active',
     '/?journal=demo',
     '/?journal=demo&entry=demo-v60',
@@ -42,18 +43,21 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?glossary=1&term=bloom',
   ]);
   assert.equal(manifest.tests[4].visual, true);
-  assert.equal(manifest.tests[4].id, 'brew.guided-timer');
+  assert.equal(manifest.tests[4].id, 'recipe.timeline');
+  assert.equal(manifest.tests[5].visual, true);
+  assert.equal(manifest.tests[5].id, 'brew.guided-timer');
   assert.equal(manifest.tests[1].expectText, '3 recipes for V60');
   assert.equal(manifest.tests[2].expectText, 'Sweet pulse');
   assert.equal(manifest.tests[3].expectText, 'Pourover Coffee original');
-  assert.equal(manifest.tests[4].expectText, 'Get ready');
-  assert.equal(manifest.tests[5].expectText, 'Staging demo: Finca El Jardín');
-  assert.equal(manifest.tests[6].expectText, 'Brew snapshot');
-  assert.equal(manifest.tests[7].expectText, 'What did you use?');
-  assert.ok(manifest.tests.slice(5, 8).every((entry) => entry.visual));
-  assert.equal(manifest.tests[16].visual, true);
-  assert.equal(manifest.tests[16].id, 'glossary.term-panel');
-  assert.match(manifest.tests[16].expectText, /gas escape/);
+  assert.equal(manifest.tests[4].expectText, 'Start at 0:00');
+  assert.equal(manifest.tests[5].expectText, 'Now');
+  assert.equal(manifest.tests[6].expectText, 'Staging demo: Finca El Jardín');
+  assert.equal(manifest.tests[7].expectText, 'Brew snapshot');
+  assert.equal(manifest.tests[8].expectText, 'What did you use?');
+  assert.ok(manifest.tests.slice(6, 9).every((entry) => entry.visual));
+  assert.equal(manifest.tests[17].visual, true);
+  assert.equal(manifest.tests[17].id, 'glossary.term-panel');
+  assert.match(manifest.tests[17].expectText, /gas escape/);
 });
 
 test('the manifest declares visual checks for the shelf screens', () => {
@@ -96,6 +100,22 @@ test('the guided timer includes an accessible non-ticking upcoming-step preview'
   assert.match(html, /id="timer-announcement"[^>]+aria-live="polite"/);
   assert.doesNotMatch(html, /id="next-step-preview"[^>]+aria-live=/);
   assert.match(source, /navigator\.vibrate\?\.\(\[12, 36, 12\]\)/);
+});
+
+test('guided brewing shares one timeline and enters a protected mobile focus mode', () => {
+  const source = read('public/app.js');
+  const recipes = read('public/recipes.js');
+  const styles = read('public/app.css');
+
+  assert.match(recipes, /function getRecipeTimeline\(recipeOrId\)/);
+  assert.match(source, /const timeline = getRecipeTimeline\(recipe\)/);
+  assert.match(source, /elements\.activeStepNumber\.textContent = `Now · Step/);
+  assert.match(source, /document\.body\.classList\.toggle\('brew-focus', active\)/);
+  assert.match(source, /Exit this guided brew\? Your timer progress will be cleared\./);
+  assert.match(source, /window\.addEventListener\('beforeunload'/);
+  assert.match(styles, /\.brew-focus #app-header/);
+  assert.match(styles, /100dvh/);
+  assert.match(styles, /safe-area-inset-bottom/);
 });
 
 test('the private journal exposes history, detail, and edit surfaces from completed brews', () => {
