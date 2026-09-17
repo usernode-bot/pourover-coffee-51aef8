@@ -75,6 +75,7 @@
   <script src="/recipes.js" defer></script>
   <script src="/glossary.js" defer></script>
   <script src="/adjustments.js" defer></script>
+  <script src="/offline.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body class="min-h-screen text-[#2c211a] antialiased">
@@ -94,6 +95,10 @@
           </span>
         </button>
         <div class="flex items-center gap-1 sm:gap-3">
+                <span id="offline-status" class="offline-status" data-state="idle" hidden>
+        <span id="offline-status-label">Offline</span>
+        <button id="offline-status-details" class="offline-status-details" type="button">Details</button>
+      </span>
           <button id="my-recipes-button" class="text-button un-touch-target" type="button">My recipes</button>
           <button id="shelf-button" class="text-button un-touch-target" type="button">My shelf</button>
           <button id="journal-button" class="text-button un-touch-target" type="button">Journal</button>
@@ -914,5 +919,24 @@
   <noscript>
     <div class="mx-auto max-w-md p-8 text-center text-sm">Pourover Coffee needs JavaScript to run the guided timer.</div>
   </noscript>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+
+  <section id="offline-status-panel" class="offline-panel" hidden>
+    <div class="offline-panel-inner">
+      <div class="offline-panel-head">
+        <h2>Sync status</h2>
+        <button id="offline-status-close" class="icon-button un-touch-target" type="button" aria-label="Close sync status">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="offline-status-list"></div>
+    </div>
+  </section>
 </body>
 </html>

@@ -49,6 +49,7 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?recipe=personal-00000000-0000-4000-8000-000000000013&demo=1',
     '/?recipeEditor=new&source=v60-bright&demo=1',
     '/?brew=personal-00000000-0000-4000-8000-000000000013&shot=active&demo=1',
+    '/?offline=shot',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'recipe.timeline');
@@ -72,13 +73,15 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[20].id, 'manual.aeropress-recipe');
   assert.equal(manifest.tests[21].id, 'manual.aeropress-timer');
   assert.ok(manifest.tests.slice(20, 22).every((entry) => entry.visual));
-  assert.deepEqual(manifest.tests.slice(22).map((entry) => entry.id), [
+  assert.deepEqual(manifest.tests.slice(22, 26).map((entry) => entry.id), [
     'personal-recipes.library',
     'personal-recipes.lineage',
     'personal-recipes.editor',
     'personal-recipes.timer',
   ]);
-  assert.ok(manifest.tests.slice(22).every((entry) => entry.visual));
+  assert.ok(manifest.tests.slice(22, 26).every((entry) => entry.visual));
+  assert.equal(manifest.tests[26].id, 'offline.sync-status');
+  assert.equal(manifest.tests[26].expectText, 'Sync status');
 });
 
 test('private recipe screens expose creation, lineage, revision, and lifecycle controls', () => {
