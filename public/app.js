@@ -42,6 +42,8 @@
     journal: document.getElementById('journal-screen'),
     journalDetail: document.getElementById('journal-detail-screen'),
     journalForm: document.getElementById('journal-form-screen'),
+    shelf: document.getElementById('shelf-screen'),
+    collection: document.getElementById('collection-screen'),
     glossary: document.getElementById('glossary-screen'),
   };
 
@@ -162,6 +164,61 @@
     journalFormError: document.getElementById('journal-form-error'),
     journalFormSave: document.getElementById('journal-form-save'),
     journalFormCancel: document.getElementById('journal-form-cancel'),
+    shelfButton: document.getElementById('shelf-button'),
+    shelfScreen: document.getElementById('shelf-screen'),
+    shelfView: document.getElementById('shelf-view'),
+    shelfTitle: document.getElementById('shelf-title'),
+    shelfIntro: document.getElementById('shelf-intro'),
+    shelfStatus: document.getElementById('shelf-status'),
+    shelfRecipeList: document.getElementById('shelf-recipe-list'),
+    shelfCollections: document.getElementById('shelf-collections'),
+    shelfEmpty: document.getElementById('shelf-empty'),
+    shelfEmptyTitle: document.getElementById('shelf-empty-title'),
+    shelfEmptyCopy: document.getElementById('shelf-empty-copy'),
+    shelfEmptyAction: document.getElementById('shelf-empty-action'),
+    shelfError: document.getElementById('shelf-error'),
+    shelfErrorCopy: document.getElementById('shelf-error-copy'),
+    shelfRetry: document.getElementById('shelf-retry'),
+    collectionCreateForm: document.getElementById('collection-create-form'),
+    collectionCreateName: document.getElementById('collection-create-name'),
+    collectionList: document.getElementById('collection-list'),
+    collectionListEmpty: document.getElementById('collection-list-empty'),
+    libraryFavoritesToggle: document.getElementById('library-favorites-toggle'),
+    libraryBrewedToggle: document.getElementById('library-brewed-toggle'),
+    libraryCollectionsLink: document.getElementById('library-collections-link'),
+    libraryShelfStatus: document.getElementById('library-shelf-status'),
+    recipeFavoriteButton: document.getElementById('recipe-favorite-button'),
+    recipeFavoriteLabel: document.getElementById('recipe-favorite-label'),
+    recipeCollectionsButton: document.getElementById('recipe-collections-button'),
+    collectionScreen: document.getElementById('collection-screen'),
+    collectionTitle: document.getElementById('collection-title'),
+    collectionCount: document.getElementById('collection-count'),
+    collectionRename: document.getElementById('collection-rename'),
+    collectionDelete: document.getElementById('collection-delete'),
+    collectionBrowse: document.getElementById('collection-browse'),
+    collectionRenameForm: document.getElementById('collection-rename-form'),
+    collectionRenameInput: document.getElementById('collection-rename-input'),
+    collectionRenameSave: document.getElementById('collection-rename-save'),
+    collectionRenameCancel: document.getElementById('collection-rename-cancel'),
+    collectionDeleteConfirmation: document.getElementById('collection-delete-confirmation'),
+    collectionDeleteCancel: document.getElementById('collection-delete-cancel'),
+    collectionDeleteConfirm: document.getElementById('collection-delete-confirm'),
+    collectionStatus: document.getElementById('collection-status'),
+    collectionOrderHint: document.getElementById('collection-order-hint'),
+    collectionRecipeList: document.getElementById('collection-recipe-list'),
+    collectionEmpty: document.getElementById('collection-empty'),
+    collectionEmptyAction: document.getElementById('collection-empty-action'),
+    collectionError: document.getElementById('collection-error'),
+    collectionPicker: document.getElementById('collection-picker'),
+    collectionPickerBackdrop: document.getElementById('collection-picker-backdrop'),
+    collectionPickerTitle: document.getElementById('collection-picker-title'),
+    collectionPickerRecipe: document.getElementById('collection-picker-recipe'),
+    collectionPickerList: document.getElementById('collection-picker-list'),
+    collectionPickerCreate: document.getElementById('collection-picker-create'),
+    collectionPickerName: document.getElementById('collection-picker-name'),
+    collectionPickerError: document.getElementById('collection-picker-error'),
+    collectionPickerClose: document.getElementById('collection-picker-close'),
+    collectionPickerDone: document.getElementById('collection-picker-done'),
     glossary: document.getElementById('glossary-button'),
     glossarySearch: document.getElementById('glossary-search'),
     glossaryList: document.getElementById('glossary-list'),
@@ -211,6 +268,17 @@
       formSource: 'manual',
       returnTo: 'journal',
     },
+    shelf: {
+      demo: false,
+      loaded: false,
+      favorites: [],
+      collections: [],
+      recentlyBrewed: [],
+      view: 'favorites',
+      loadedDemo: null,
+    },
+    shelfFilters: { favorites: false, brewed: false },
+    collection: { id: null, recipeId: null },
   };
 
   function loadDoses() {
@@ -386,11 +454,27 @@
 
   function renderLibrary() {
     elements.methodList.innerHTML = METHODS.map(methodCard).join('');
-    const filtered = filterRecipes(state.filters);
+    let filtered = filterRecipes(state.filters);
+    const shelfFilterActive = state.shelfFilters.favorites || state.shelfFilters.brewed;
+    // Degrade open: if the shelf could not be loaded, an empty filter set would
+    // hide the whole library. Better to show everything and say so than to
+    // answer "no favorites" from data we do not have.
+    const shelfIds = !shelfFilterActive || !state.shelf.loaded
+      ? null
+      : new Set([
+        ...(state.shelfFilters.favorites ? state.shelf.favorites.map((recipe) => recipe.id) : []),
+        ...(state.shelfFilters.brewed ? state.shelf.recentlyBrewed.map((recipe) => recipe.id) : []),
+      ]);
+    if (shelfIds) filtered = filtered.filter((recipe) => shelfIds.has(recipe.id));
     renderRecipeCards(elements.recipeList, filtered);
     elements.resultCount.textContent = `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'}`;
     elements.recipeList.hidden = filtered.length === 0;
     elements.emptyState.hidden = filtered.length !== 0;
+    elements.emptyState.querySelector('h3').textContent = shelfIds ? 'Nothing on your shelf matches' : 'No recipes match yet';
+    elements.emptyState.querySelector('p').textContent = shelfIds
+      ? 'Clear the shelf filter or a facet to see more.'
+      : 'Try removing one filter to broaden the shelf.';
+    syncShelfUi();
 
     for (const key of FILTER_KEYS) {
       elements.filters.elements[key].value = state.filters[key] || '';
@@ -486,6 +570,7 @@
     }).join('');
     elements.doseMinus.disabled = recipe.coffee <= MIN_COFFEE_GRAMS;
     elements.dosePlus.disabled = recipe.coffee >= MAX_COFFEE_GRAMS;
+    syncShelfUi();
   }
 
   function updateDose(value) {
@@ -616,7 +701,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', ...TAG_KEYS]
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', ...TAG_KEYS]
       .forEach((key) => url.searchParams.delete(key));
   }
 
@@ -651,6 +736,18 @@
         if (state.scaled?.coffee) url.searchParams.set('dose', state.scaled.coffee);
         if (state.journal.returnTo) url.searchParams.set('from', state.journal.returnTo);
       }
+    }
+    if (screen === 'shelf') {
+      url.searchParams.set('shelf', state.shelf.view);
+      if (state.shelf.demo) url.searchParams.set('demo', '1');
+    }
+    if (screen === 'collection') {
+      url.searchParams.set('collection', id);
+      if (state.shelf.demo) url.searchParams.set('demo', '1');
+    }
+    if (screen === 'library') {
+      if (state.shelfFilters.favorites) url.searchParams.set('favorites', '1');
+      if (state.shelfFilters.brewed) url.searchParams.set('brewed', '1');
     }
     if (screen === 'glossary') {
       url.searchParams.set('glossary', '1');
@@ -727,6 +824,18 @@
       });
       return;
     }
+    const shelfMode = params.get('shelf');
+    const collectionId = params.get('collection');
+    const demo = params.get('demo') === '1';
+    if (collectionId) {
+      openShelf({ view: 'collections', demo, historyMode: null, focus, transition: 'none' });
+      openCollection(collectionId, { historyMode: null, focus, transition: 'none' });
+      return;
+    }
+    if (shelfMode === 'favorites' || shelfMode === 'brewed' || shelfMode === 'collections') {
+      openShelf({ view: shelfMode, demo, historyMode: null, focus, transition: 'none' });
+      return;
+    }
     const brewId = params.get('brew');
     const recipeId = params.get('recipe');
     const methodId = params.get('method');
@@ -764,7 +873,10 @@
     }
     if (recipeId && isKnownRecipeReference(recipeId)) {
       chooseRecipe(recipeId);
+      state.shelf.demo = demo;
+      if (demo !== state.shelf.loadedDemo) loadShelf({ demo, quiet: true });
       showScreen('recipe', { focus, transition: 'none' });
+      if (shot === 'picker') openCollectionPicker(state.recipe.id);
       return;
     }
     if (methodId && METHODS.some((method) => method.id === methodId)) {
@@ -773,6 +885,12 @@
       return;
     }
     state.filters = filtersFromLocation(params);
+    state.shelfFilters = {
+      favorites: params.get('favorites') === '1',
+      brewed: params.get('brewed') === '1',
+    };
+    state.shelf.demo = demo;
+    if (!state.shelf.loaded || demo !== state.shelf.loadedDemo) loadShelf({ demo, quiet: true });
     renderLibrary();
     showScreen('library', { focus, transition: 'none' });
   }
@@ -787,6 +905,14 @@
 
   function clearFilters() {
     state.filters = {};
+    state.shelfFilters = { favorites: false, brewed: false };
+    renderLibrary();
+    history.replaceState({ screen: 'library' }, '', urlFor('library'));
+  }
+
+  function setShelfFilter(name) {
+    state.shelfFilters[name] = !state.shelfFilters[name];
+    if (state.shelfFilters[name] && !state.shelf.loaded) loadShelf({ demo: state.shelf.demo, quiet: true });
     renderLibrary();
     history.replaceState({ screen: 'library' }, '', urlFor('library'));
   }
@@ -875,6 +1001,453 @@
     if (historyMode) history[historyMode]({ screen: 'journal' }, '', urlFor('journal'));
     showScreen('journal', { focus, transition });
     loadJournal();
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Favorites and personal collections ("the shelf").
+  //
+  // The server owns the data and returns latest-revision summaries, so the
+  // client never has to resolve a recipe id itself. Local mirrors here only
+  // exist so the library can filter and so a favorite heart can render its
+  // pressed state without a round trip per card.
+  // -------------------------------------------------------------------------
+
+  function shelfApiPath(path = '') {
+    const query = new URLSearchParams();
+    if (state.shelf.demo) query.set('demo', '1');
+    const suffix = query.toString();
+    return `/api/shelf${path}${suffix ? `?${suffix}` : ''}`;
+  }
+
+  function shelfRecipes(kind) {
+    if (kind === 'brewed') return state.shelf.recentlyBrewed;
+    return state.shelf.favorites;
+  }
+
+  function favoriteIdSet() {
+    return new Set(state.shelf.favorites.map((recipe) => recipe.id));
+  }
+
+  function isFavoriteRecipe(recipeId) {
+    return favoriteIdSet().has(recipeId);
+  }
+
+  // Boot kicks off a shelf load and the route handler may kick off another
+  // (a different demo flag). Only the newest request is allowed to write
+  // state, so a slower earlier response can never blank a newer one.
+  let shelfRequestSeq = 0;
+
+  async function loadShelf({ demo = state.shelf.demo, quiet = false } = {}) {
+    const requestId = (shelfRequestSeq += 1);
+    state.shelf.demo = demo;
+    if (!quiet) {
+      elements.shelfStatus.textContent = 'Loading your shelf…';
+      elements.shelfError.hidden = true;
+      elements.shelfEmpty.hidden = true;
+    }
+    try {
+      const payload = await apiFetch(shelfApiPath());
+      if (requestId !== shelfRequestSeq) return;
+      state.shelf.favorites = payload.favorites || [];
+      state.shelf.collections = payload.collections || [];
+      state.shelf.recentlyBrewed = payload.recentlyBrewed || [];
+      state.shelf.demo = Boolean(payload.demo);
+      state.shelf.loaded = true;
+      state.shelf.loadedDemo = Boolean(payload.demo);
+      renderShelf();
+      // The library's shelf filter and every favorite heart are rendered from
+      // this data, so a late-arriving shelf has to repaint whichever screen is
+      // already on screen rather than only the shelf view.
+      if (state.screen === 'library') renderLibrary();
+      if (state.screen === 'recipe' || state.screen === 'brew') renderRecipe();
+      if (state.screen === 'collection') renderCollectionScreen();
+      if (!elements.collectionPicker.hidden) renderCollectionPicker();
+      syncShelfUi();
+    } catch (error) {
+      if (requestId !== shelfRequestSeq) return;
+      state.shelf.favorites = [];
+      state.shelf.collections = [];
+      state.shelf.recentlyBrewed = [];
+      state.shelf.loaded = false;
+      elements.shelfStatus.textContent = '';
+      elements.shelfErrorCopy.textContent = error.message;
+      elements.shelfError.hidden = false;
+      elements.shelfRecipeList.hidden = true;
+      elements.shelfCollections.hidden = true;
+      elements.shelfEmpty.hidden = true;
+      syncShelfUi();
+    }
+  }
+
+  // Favoriting happens on the recipe screen only, so the recipe page's own
+  // control is the one piece of favorite state that needs syncing. The
+  // library's shelf filter reads the same list rather than a card's heart.
+  function syncShelfUi() {
+    const favorites = favoriteIdSet();
+    const detailFavorite = state.recipe && favorites.has(state.recipe.id);
+    elements.recipeFavoriteButton.setAttribute('aria-pressed', String(Boolean(detailFavorite)));
+    elements.recipeFavoriteButton.classList.toggle('is-favorite', Boolean(detailFavorite));
+    elements.recipeFavoriteLabel.textContent = detailFavorite ? 'Saved to favorites' : 'Favorite';
+
+    const activeFilters = state.shelfFilters.favorites || state.shelfFilters.brewed;
+    elements.libraryFavoritesToggle.setAttribute('aria-pressed', String(state.shelfFilters.favorites));
+    elements.libraryBrewedToggle.setAttribute('aria-pressed', String(state.shelfFilters.brewed));
+    elements.libraryFavoritesToggle.classList.toggle('is-active', state.shelfFilters.favorites);
+    elements.libraryBrewedToggle.classList.toggle('is-active', state.shelfFilters.brewed);
+    if (activeFilters && state.shelf.demo) {
+      elements.libraryShelfStatus.textContent = 'Showing read-only staging examples. Your own shelf uses the same layout.';
+      elements.libraryShelfStatus.hidden = false;
+    } else if (activeFilters && !state.shelf.loaded) {
+      elements.libraryShelfStatus.textContent = 'Your shelf could not be loaded, so no recipes are filtered out.';
+      elements.libraryShelfStatus.hidden = false;
+    } else {
+      elements.libraryShelfStatus.textContent = '';
+      elements.libraryShelfStatus.hidden = true;
+    }
+  }
+
+  async function setFavorite(recipeId, favorite) {
+    const request = favorite
+      ? apiFetch(`/api/favorites/${encodeURIComponent(recipeId)}`, { method: 'PUT' })
+      : apiFetch(`/api/favorites/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+    await request;
+    const set = favoriteIdSet();
+    if (favorite) set.add(recipeId); else set.delete(recipeId);
+    const recipe = RECIPES.find((candidate) => candidate.id === recipeId);
+    const summary = recipe ? recipeSummaryForClient(recipe) : null;
+    const list = state.shelf.favorites.filter((entry) => entry.id !== recipeId);
+    if (favorite && summary) list.unshift(summary);
+    state.shelf.favorites = list;
+    state.shelf.loaded = true;
+    state.shelf.loadedDemo = state.shelf.demo;
+    renderLibrary();
+    renderShelf();
+    syncShelfUi();
+  }
+
+  async function toggleFavorite(recipeId, button) {
+    const wasFavorite = isFavoriteRecipe(recipeId);
+    button.disabled = true;
+    try {
+      await setFavorite(recipeId, !wasFavorite);
+      if (window.unNative?.toast) {
+        window.unNative.toast(wasFavorite ? 'Removed from favorites' : 'Saved to favorites');
+      }
+    } catch (error) {
+      if (window.unNative?.toast) window.unNative.toast(error.message);
+      else console.warn(error.message);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function recipeSummaryForClient(recipe) {
+    const method = getMethod(recipe.methodId);
+    return {
+      id: recipe.id,
+      revisionId: recipe.revisionId,
+      version: recipe.version,
+      methodId: method.id,
+      methodName: method.name,
+      title: recipe.title,
+      summary: recipe.summary,
+      ratio: recipe.ratio,
+      defaultCoffee: recipe.defaultCoffee,
+      water: Math.round(recipe.defaultCoffee * recipe.ratio),
+      totalDuration: recipe.steps.reduce((sum, recipeStep) => sum + recipeStep.duration, 0),
+      difficulty: recipe.difficulty,
+      tags: recipe.tags,
+      accent: method.accent,
+      soft: method.soft,
+    };
+  }
+
+  function shelfRecipeCard(recipe) {
+    const method = getMethod(recipe.methodId);
+    return `
+      <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
+        <span class="brew-recipe-topline">
+          <span>${escapeHtml(method.name)}</span>
+          <span>${escapeHtml(getTagLabel('profile', recipe.tags.profile[0]))} · v${escapeHtml(recipe.version)}</span>
+        </span>
+        <span class="brew-recipe-title">${escapeHtml(recipe.title)}</span>
+        <span class="brew-recipe-summary">${escapeHtml(recipe.summary)}</span>
+        <span class="recipe-tags" aria-label="Recipe tags"><span class="recipe-tag">1:${escapeHtml(formatRatio(recipe.ratio))}</span><span class="recipe-tag">${escapeHtml(formatDuration(recipe.totalDuration))}</span></span>
+        <span class="brew-recipe-footer">
+          <span>${escapeHtml(recipe.difficulty)}</span>
+          <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+        </span>
+      </button>`;
+  }
+
+  function renderShelf() {
+    const view = state.shelf.view;
+    elements.shelfView.value = view;
+    const collectionsView = view === 'collections';
+    const recipes = shelfRecipes(view);
+    const heading = view === 'brewed' ? 'Recently brewed' : (collectionsView ? 'Collections' : 'Favorites');
+    const intro = view === 'brewed'
+      ? 'The recipes behind your latest brews, newest first.'
+      : collectionsView
+        ? 'Small shelves you arrange yourself. Private to your account.'
+        : 'Recipes you starred, kept private to your account.';
+    elements.shelfTitle.textContent = heading;
+    elements.shelfIntro.textContent = intro;
+
+    elements.shelfCollections.hidden = !collectionsView;
+    elements.shelfRecipeList.hidden = collectionsView || recipes.length === 0;
+    elements.shelfRecipeList.innerHTML = collectionsView ? '' : recipes.map(shelfRecipeCard).join('');
+    if (collectionsView) renderCollections();
+
+    const empty = !collectionsView && recipes.length === 0;
+    elements.shelfEmpty.hidden = !empty;
+    if (empty) {
+      elements.shelfEmptyTitle.textContent = view === 'brewed' ? 'No brews logged yet' : 'No favorites yet';
+      elements.shelfEmptyCopy.textContent = view === 'brewed'
+        ? 'Finish a guided brew or log one by hand and it will appear here.'
+        : 'Open a recipe and choose Favorite to keep it close.';
+      elements.shelfEmptyAction.textContent = 'Browse the library';
+    }
+    elements.shelfStatus.textContent = state.shelf.demo
+      ? 'Showing read-only staging examples. Your private shelf uses the same layout.'
+      : '';
+    elements.shelfEmptyAction.dataset.shelfAction = view === 'brewed' ? 'journal' : 'library';
+  }
+
+  function renderCollections() {
+    const list = state.shelf.collections;
+    elements.collectionListEmpty.hidden = list.length !== 0;
+    elements.collectionList.innerHTML = list.map((collection, index) => `
+      <li class="collection-row" data-collection-id="${escapeHtml(collection.id)}">
+        <button class="collection-open" type="button" data-open-collection="${escapeHtml(collection.id)}">
+          <span class="collection-name">${escapeHtml(collection.name)}</span>
+          <span class="collection-count">${collection.recipes.length} ${collection.recipes.length === 1 ? 'recipe' : 'recipes'}</span>
+        </button>
+        <span class="collection-row-actions">
+          <button class="icon-button un-touch-target" type="button" data-move-collection="${escapeHtml(collection.id)}" data-direction="up" aria-label="Move ${escapeHtml(collection.name)} up" ${index === 0 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+          </button>
+          <button class="icon-button un-touch-target" type="button" data-move-collection="${escapeHtml(collection.id)}" data-direction="down" aria-label="Move ${escapeHtml(collection.name)} down" ${index === list.length - 1 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        </span>
+      </li>`).join('');
+  }
+
+  function openShelf({ view = 'favorites', demo = state.shelf.demo, historyMode = 'pushState', focus = true, transition = 'push', reload = false } = {}) {
+    state.shelf.view = view;
+    state.shelf.demo = demo;
+    if (historyMode) history[historyMode]({ screen: 'shelf' }, '', urlFor('shelf'));
+    showScreen('shelf', { focus, transition });
+    // Compare against what was actually LOADED, not what was just set: a
+    // demo/real switch needs a refetch, and the comparison below would
+    // otherwise always read equal.
+    if (!state.shelf.loaded || reload || demo !== state.shelf.loadedDemo) loadShelf({ demo });
+    else renderShelf();
+  }
+
+  function findCollection(id) {
+    return state.shelf.collections.find((collection) => String(collection.id) === String(id)) || null;
+  }
+
+  function formatCollectionId(id) {
+    return String(id);
+  }
+
+  function renderCollectionScreen() {
+    const collection = findCollection(state.collection.id);
+    if (!collection) {
+      elements.collectionStatus.textContent = '';
+      elements.collectionRecipeList.innerHTML = '';
+      elements.collectionRecipeList.hidden = true;
+      elements.collectionEmpty.hidden = true;
+      elements.collectionError.textContent = 'That collection is no longer available.';
+      elements.collectionError.hidden = false;
+      return;
+    }
+    elements.collectionError.hidden = true;
+    elements.collectionTitle.textContent = collection.name;
+    elements.collectionCount.textContent = `${collection.recipes.length} ${collection.recipes.length === 1 ? 'recipe' : 'recipes'} · order kept as you set it`;
+    elements.collectionOrderHint.hidden = collection.recipes.length < 2;
+    elements.collectionRecipeList.hidden = collection.recipes.length === 0;
+    elements.collectionEmpty.hidden = collection.recipes.length !== 0;
+    elements.collectionStatus.textContent = state.shelf.demo
+      ? 'Read-only staging example. Your own collection uses the same layout.'
+      : '';
+    elements.collectionRecipeList.innerHTML = collection.recipes.map((recipe, index) => `
+      <li class="collection-recipe-row" data-recipe-id="${escapeHtml(recipe.id)}">
+        <span class="collection-recipe-position" aria-hidden="true">${index + 1}</span>
+        <button class="collection-recipe-open" type="button" data-recipe-id="${escapeHtml(recipe.id)}">
+          <span class="collection-recipe-title">${escapeHtml(recipe.title)}</span>
+          <span class="collection-recipe-meta">${escapeHtml(recipe.methodName)} · ${escapeHtml(recipe.difficulty)} · v${escapeHtml(recipe.version)}</span>
+        </button>
+        <span class="collection-recipe-actions">
+          <button class="icon-button un-touch-target" type="button" data-move-recipe="${escapeHtml(recipe.id)}" data-direction="up" aria-label="Move ${escapeHtml(recipe.title)} up" ${index === 0 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg>
+          </button>
+          <button class="icon-button un-touch-target" type="button" data-move-recipe="${escapeHtml(recipe.id)}" data-direction="down" aria-label="Move ${escapeHtml(recipe.title)} down" ${index === collection.recipes.length - 1 ? 'disabled' : ''}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <button class="icon-button un-touch-target" type="button" data-remove-recipe="${escapeHtml(recipe.id)}" aria-label="Remove ${escapeHtml(recipe.title)} from this collection">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </span>
+      </li>`).join('');
+  }
+
+  function openCollection(id, { historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    state.collection.id = formatCollectionId(id);
+    if (historyMode) history[historyMode]({ screen: 'collection', id: state.collection.id }, '', urlFor('collection', state.collection.id));
+    showScreen('collection', { focus, transition });
+    renderCollectionScreen();
+  }
+
+  async function mutateCollection(request, { successMessage } = {}) {
+    elements.collectionError.hidden = true;
+    try {
+      const payload = await request();
+      if (payload && payload.collection) {
+        const index = state.shelf.collections.findIndex((entry) => String(entry.id) === String(payload.collection.id));
+        if (index >= 0) state.shelf.collections[index] = payload.collection;
+        else state.shelf.collections.push(payload.collection);
+      }
+      renderCollectionScreen();
+      renderCollections();
+      if (successMessage && window.unNative?.toast) window.unNative.toast(successMessage);
+      return true;
+    } catch (error) {
+      elements.collectionError.textContent = error.message;
+      elements.collectionError.hidden = false;
+      return false;
+    }
+  }
+
+  async function moveCollection(id, direction) {
+    const list = [...state.shelf.collections];
+    const index = list.findIndex((collection) => String(collection.id) === String(id));
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    state.shelf.collections = list;
+    renderCollections();
+    try {
+      const payload = await apiFetch('/api/collections/order', {
+        method: 'PATCH',
+        body: JSON.stringify({ collectionIds: list.map((collection) => collection.id) }),
+      });
+      state.shelf.collections = payload.collections;
+      renderCollections();
+    } catch (error) {
+      elements.shelfStatus.textContent = error.message;
+      await loadShelf({ quiet: true });
+    }
+  }
+
+  async function moveCollectionRecipe(recipeId, direction) {
+    const collection = findCollection(state.collection.id);
+    if (!collection) return;
+    const ids = collection.recipes.map((recipe) => recipe.id);
+    const index = ids.indexOf(recipeId);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const optimistic = { ...collection, recipes: ids.map((id) => collection.recipes.find((recipe) => recipe.id === id)) };
+    const position = state.shelf.collections.findIndex((entry) => String(entry.id) === String(collection.id));
+    state.shelf.collections[position] = optimistic;
+    renderCollectionScreen();
+    await mutateCollection(() => apiFetch(`/api/collections/${encodeURIComponent(collection.id)}/order`, {
+      method: 'PATCH',
+      body: JSON.stringify({ recipeIds: ids }),
+    }));
+  }
+
+  function collectionPickerRow(collection, recipeId) {
+    const member = collection.recipes.some((recipe) => recipe.id === recipeId);
+    return `
+      <button class="collection-picker-row${member ? ' is-member' : ''}" type="button" data-pick-collection="${escapeHtml(collection.id)}" aria-pressed="${member}">
+        <span class="collection-picker-name">${escapeHtml(collection.name)}</span>
+        <span class="collection-picker-mark" aria-hidden="true">${member ? '✓' : '＋'}</span>
+      </button>`;
+  }
+
+  function renderCollectionPicker() {
+    const recipeId = state.collection.recipeId;
+    const recipe = RECIPES.find((candidate) => candidate.id === recipeId);
+    elements.collectionPickerRecipe.textContent = recipe ? recipe.title : '';
+    if (!state.shelf.collections.length) {
+      elements.collectionPickerList.innerHTML = '<p class="collection-picker-empty">You have no collections yet. Create one below and this recipe goes straight in.</p>';
+      return;
+    }
+    elements.collectionPickerList.innerHTML = state.shelf.collections.map((collection) => collectionPickerRow(collection, recipeId)).join('');
+  }
+
+  async function openCollectionPicker(recipeId) {
+    state.collection.recipeId = recipeId;
+    elements.collectionPickerError.hidden = true;
+    elements.collectionPickerName.value = '';
+    elements.collectionPicker.hidden = false;
+    document.body.classList.add('term-open');
+    document.getElementById('app-shell').inert = true;
+    elements.collectionPickerTitle.focus({ preventScroll: true });
+    if (!state.shelf.loaded) await loadShelf({ quiet: true });
+    renderCollectionPicker();
+  }
+
+  function closeCollectionPicker({ restoreFocus = true } = {}) {
+    if (elements.collectionPicker.hidden) return;
+    elements.collectionPicker.hidden = true;
+    document.body.classList.remove('term-open');
+    document.getElementById('app-shell').inert = false;
+    if (restoreFocus && elements.recipeCollectionsButton) elements.recipeCollectionsButton.focus({ preventScroll: true });
+  }
+
+  async function pickCollection(collectionId) {
+    const recipeId = state.collection.recipeId;
+    const collection = findCollection(collectionId);
+    if (!collection || !recipeId) return;
+    const member = collection.recipes.some((recipe) => recipe.id === recipeId);
+    elements.collectionPickerError.hidden = true;
+    try {
+      if (member) {
+        await apiFetch(`/api/collections/${encodeURIComponent(collectionId)}/recipes/${encodeURIComponent(recipeId)}`, { method: 'DELETE' });
+        collection.recipes = collection.recipes.filter((recipe) => recipe.id !== recipeId);
+      } else {
+        const payload = await apiFetch(`/api/collections/${encodeURIComponent(collectionId)}/recipes`, {
+          method: 'POST',
+          body: JSON.stringify({ recipeId }),
+        });
+        const index = state.shelf.collections.findIndex((entry) => String(entry.id) === String(collectionId));
+        state.shelf.collections[index] = payload.collection;
+      }
+      renderCollectionPicker();
+      renderCollections();
+      renderCollectionScreen();
+      if (window.unNative?.toast) {
+        window.unNative.toast(member ? `Removed from ${collection.name}` : `Added to ${collection.name}`);
+      }
+    } catch (error) {
+      elements.collectionPickerError.textContent = error.message;
+      elements.collectionPickerError.hidden = false;
+    }
+  }
+
+  async function createCollectionFromPicker(event) {
+    event.preventDefault();
+    const name = elements.collectionPickerName.value.trim();
+    if (!name) return;
+    elements.collectionPickerError.hidden = true;
+    try {
+      const payload = await apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ name }) });
+      state.shelf.collections.push(payload.collection);
+      elements.collectionPickerName.value = '';
+      renderCollectionPicker();
+      renderCollections();
+      await pickCollection(payload.collection.id);
+    } catch (error) {
+      elements.collectionPickerError.textContent = error.message;
+      elements.collectionPickerError.hidden = false;
+    }
   }
 
   function definitionRows(rows) {
@@ -1424,6 +1997,11 @@
   });
   elements.termPanelBackdrop.addEventListener('click', () => closeTerm());
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !elements.collectionPicker.hidden) {
+      event.preventDefault();
+      closeCollectionPicker();
+      return;
+    }
     if (event.key === 'Escape' && state.term.open) {
       event.preventDefault();
       closeTerm();
@@ -1450,7 +2028,130 @@
   });
   window.addEventListener('pagehide', cancelTimerTick);
 
+
+  // -------------------------------------------------------------------------
+  // Shelf events.
+  // -------------------------------------------------------------------------
+
+  elements.shelfButton.addEventListener('click', () => openShelf({ transition: 'push' }));
+  elements.libraryFavoritesToggle.addEventListener('click', () => setShelfFilter('favorites'));
+  elements.libraryBrewedToggle.addEventListener('click', () => setShelfFilter('brewed'));
+  elements.libraryCollectionsLink.addEventListener('click', () => openShelf({ view: 'collections', transition: 'push' }));
+  elements.shelfView.addEventListener('change', () => {
+    state.shelf.view = elements.shelfView.value;
+    history.replaceState({ screen: 'shelf' }, '', urlFor('shelf'));
+    renderShelf();
+  });
+  elements.shelfRetry.addEventListener('click', () => loadShelf());
+  elements.shelfEmptyAction.addEventListener('click', () => {
+    if (elements.shelfEmptyAction.dataset.shelfAction === 'journal') openJournal({ transition: 'push' });
+    else navigate('library', null, { transition: 'push' });
+  });
+  elements.shelfRecipeList.addEventListener('click', handleRecipeCardClick);
+
+  elements.recipeFavoriteButton.addEventListener('click', () => toggleFavorite(state.recipe.id, elements.recipeFavoriteButton));
+  elements.recipeCollectionsButton.addEventListener('click', () => openCollectionPicker(state.recipe.id));
+  elements.collectionPickerClose.addEventListener('click', () => closeCollectionPicker());
+  elements.collectionPickerDone.addEventListener('click', () => closeCollectionPicker());
+  elements.collectionPickerBackdrop.addEventListener('click', () => closeCollectionPicker());
+  elements.collectionPickerCreate.addEventListener('submit', createCollectionFromPicker);
+  elements.collectionPickerList.addEventListener('click', (event) => {
+    const row = event.target.closest('[data-pick-collection]');
+    if (row) pickCollection(row.dataset.pickCollection);
+  });
+
+  elements.collectionCreateForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const name = elements.collectionCreateName.value.trim();
+    if (!name) {
+      elements.collectionCreateName.focus({ preventScroll: true });
+      return;
+    }
+    try {
+      const payload = await apiFetch('/api/collections', { method: 'POST', body: JSON.stringify({ name }) });
+      state.shelf.collections.push(payload.collection);
+      state.shelf.loaded = true;
+      elements.collectionCreateName.value = '';
+      renderCollections();
+      if (window.unNative?.toast) window.unNative.toast('Collection created');
+    } catch (error) {
+      elements.shelfStatus.textContent = error.message;
+    }
+  });
+
+  elements.collectionList.addEventListener('click', (event) => {
+    const open = event.target.closest('[data-open-collection]');
+    if (open) {
+      openCollection(open.dataset.openCollection, { transition: 'push' });
+      return;
+    }
+    const move = event.target.closest('[data-move-collection]');
+    if (move) moveCollection(move.dataset.moveCollection, move.dataset.direction);
+  });
+
+  elements.collectionRename.addEventListener('click', () => {
+    const collection = findCollection(state.collection.id);
+    if (!collection) return;
+    elements.collectionRenameInput.value = collection.name;
+    elements.collectionRenameForm.hidden = false;
+    elements.collectionRenameInput.focus({ preventScroll: true });
+  });
+  elements.collectionRenameCancel.addEventListener('click', () => {
+    elements.collectionRenameForm.hidden = true;
+  });
+  elements.collectionRenameSave.addEventListener('click', async () => {
+    const name = elements.collectionRenameInput.value.trim();
+    if (!name) return;
+    const ok = await mutateCollection(() => apiFetch(`/api/collections/${encodeURIComponent(state.collection.id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }), { successMessage: 'Collection renamed' });
+    if (ok) elements.collectionRenameForm.hidden = true;
+  });
+  elements.collectionDelete.addEventListener('click', () => {
+    elements.collectionDeleteConfirmation.hidden = false;
+    elements.collectionDeleteConfirm.focus();
+  });
+  elements.collectionDeleteCancel.addEventListener('click', () => {
+    elements.collectionDeleteConfirmation.hidden = true;
+    elements.collectionDelete.focus();
+  });
+  elements.collectionDeleteConfirm.addEventListener('click', async () => {
+    try {
+      await apiFetch(`/api/collections/${encodeURIComponent(state.collection.id)}`, { method: 'DELETE' });
+      state.shelf.collections = state.shelf.collections.filter(
+        (collection) => String(collection.id) !== String(state.collection.id)
+      );
+      if (window.unNative?.toast) window.unNative.toast('Collection deleted');
+      openShelf({ view: 'collections', historyMode: 'replaceState', transition: 'pop', reload: false });
+      renderCollections();
+    } catch (error) {
+      elements.collectionError.textContent = error.message;
+      elements.collectionError.hidden = false;
+    }
+  });
+  elements.collectionBrowse.addEventListener('click', () => navigate('library', null, { transition: 'pop' }));
+  elements.collectionEmptyAction.addEventListener('click', () => navigate('library', null, { transition: 'pop' }));
+  elements.collectionRecipeList.addEventListener('click', (event) => {
+    const move = event.target.closest('[data-move-recipe]');
+    if (move) {
+      moveCollectionRecipe(move.dataset.moveRecipe, move.dataset.direction);
+      return;
+    }
+    const remove = event.target.closest('[data-remove-recipe]');
+    if (remove) {
+      mutateCollection(() => apiFetch(
+        `/api/collections/${encodeURIComponent(state.collection.id)}/recipes/${encodeURIComponent(remove.dataset.removeRecipe)}`,
+        { method: 'DELETE' }
+      ), { successMessage: 'Removed from collection' });
+      return;
+    }
+    const open = event.target.closest('.collection-recipe-open');
+    if (open) navigate('recipe', open.dataset.recipeId, { transition: 'push' });
+  });
+
   populateFilters();
   populateJournalControls();
+  loadShelf({ quiet: true });
   parseLocation();
 })();

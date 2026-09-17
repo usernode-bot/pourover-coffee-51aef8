@@ -93,6 +93,7 @@
           </span>
         </button>
         <div class="flex items-center gap-1 sm:gap-3">
+          <button id="shelf-button" class="text-button un-touch-target" type="button">My shelf</button>
           <button id="journal-button" class="text-button un-touch-target" type="button">Journal</button>
           <button id="glossary-button" class="text-button un-touch-target" type="button">Glossary</button>
           <button id="about-button" class="text-button un-touch-target" type="button">About</button>
@@ -164,6 +165,13 @@
             </label>
           </form>
 
+          <div id="library-shelf-filters" class="shelf-toggle-row mt-5" role="group" aria-label="Filter by your shelf">
+            <button id="library-favorites-toggle" class="shelf-toggle" type="button" aria-pressed="false" data-shelf-filter="favorites">Favorites</button>
+            <button id="library-brewed-toggle" class="shelf-toggle" type="button" aria-pressed="false" data-shelf-filter="brewed">Recently brewed</button>
+            <button id="library-collections-link" class="shelf-toggle shelf-toggle-link" type="button">Collections</button>
+          </div>
+          <p id="library-shelf-status" class="shelf-library-status mt-3" role="status" aria-live="polite" hidden></p>
+
           <div class="mt-4 flex flex-wrap items-center gap-2">
             <div id="active-filters" class="flex flex-wrap gap-2" aria-label="Active filters" hidden></div>
             <button id="clear-filters" class="clear-filter-button" type="button" hidden>Clear all</button>
@@ -217,6 +225,16 @@
             <h1 id="recipe-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl"></h1>
             <p id="recipe-description" class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base"></p>
             <p id="recipe-attribution" class="source-badge mt-4"></p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button id="recipe-favorite-button" class="shelf-action" type="button" aria-pressed="false">
+                <span class="shelf-action-icon" aria-hidden="true">♡</span>
+                <span id="recipe-favorite-label">Favorite</span>
+              </button>
+              <button id="recipe-collections-button" class="shelf-action" type="button">
+                <span class="shelf-action-icon" aria-hidden="true">＋</span>
+                <span>Add to collection</span>
+              </button>
+            </div>
           </div>
           <div id="recipe-art" class="recipe-hero-art" aria-hidden="true"></div>
         </div>
@@ -283,6 +301,115 @@
             </button>
           </section>
         </div>
+      </section>
+
+      <section id="shelf-screen" class="screen" data-screen="shelf" data-active="false" aria-labelledby="shelf-title" hidden>
+        <div class="journal-hero rounded-[2rem] px-5 py-7 sm:px-8 sm:py-9">
+          <span class="journal-hero-mark" aria-hidden="true">★</span>
+          <div class="relative z-10">
+            <p class="eyebrow">Your own shelf</p>
+            <h1 id="shelf-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Favorites</h1>
+            <p id="shelf-intro" class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base">Recipes you starred, kept private to your account.</p>
+          </div>
+        </div>
+
+        <div class="journal-filter-grid mt-4">
+          <label class="journal-field">
+            <span>Show</span>
+            <select id="shelf-view">
+              <option value="favorites">Favorites</option>
+              <option value="brewed">Recently brewed</option>
+              <option value="collections">Collections</option>
+            </select>
+          </label>
+        </div>
+
+        <p id="shelf-status" class="journal-status mt-4" role="status" aria-live="polite"></p>
+
+        <div id="shelf-recipe-list" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Saved recipes"></div>
+
+        <div id="shelf-collections" class="mt-4" hidden>
+          <form id="collection-create-form" class="collection-create" aria-label="Create a collection">
+            <label class="journal-field">
+              <span>New collection</span>
+              <input id="collection-create-name" name="name" maxlength="60" placeholder="Staging demo: Weekday mornings" autocomplete="off">
+            </label>
+            <button id="collection-create-submit" class="primary-button justify-center" type="submit">Create</button>
+          </form>
+          <ul id="collection-list" class="collection-list mt-4" aria-label="Your collections"></ul>
+          <p id="collection-list-empty" class="empty-state mt-4" hidden>
+            <span aria-hidden="true">☕</span>
+            <strong>No collections yet</strong>
+            <span>Group recipes for a mood, a grinder, or a coffee you keep coming back to.</span>
+          </p>
+        </div>
+
+        <div id="shelf-empty" class="empty-state mt-5" hidden>
+          <span aria-hidden="true">♡</span>
+          <strong id="shelf-empty-title">Nothing here yet</strong>
+          <p id="shelf-empty-copy">Open a recipe and choose Favorite to keep it close.</p>
+          <button id="shelf-empty-action" class="outline-button" type="button">Browse the library</button>
+        </div>
+
+        <div id="shelf-error" class="journal-error mt-5" role="alert" hidden>
+          <div>
+            <strong>Your shelf could not be loaded</strong>
+            <p id="shelf-error-copy">Please try again in a moment.</p>
+          </div>
+          <button id="shelf-retry" class="outline-button" type="button">Try again</button>
+        </div>
+      </section>
+
+      <section id="collection-screen" class="screen" data-screen="collection" data-active="false" aria-labelledby="collection-title" hidden>
+        <div class="journal-detail-hero rounded-[2rem] p-5 sm:p-8">
+          <div class="relative z-10 max-w-2xl">
+            <p class="eyebrow">Collection</p>
+            <h1 id="collection-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl"></h1>
+            <p id="collection-count" class="mt-2 text-sm text-[#756456]"></p>
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-2">
+          <button id="collection-rename" class="outline-button justify-center" type="button">Rename</button>
+          <button id="collection-delete" class="danger-button justify-center" type="button">Delete collection</button>
+          <button id="collection-browse" class="outline-button justify-center" type="button">Add recipes from the library</button>
+        </div>
+
+        <div id="collection-rename-form" class="collection-rename mt-4" hidden>
+          <label class="journal-field">
+            <span>Collection name</span>
+            <input id="collection-rename-input" maxlength="60" autocomplete="off">
+          </label>
+          <div class="flex flex-wrap gap-2">
+            <button id="collection-rename-save" class="primary-button justify-center" type="button">Save name</button>
+            <button id="collection-rename-cancel" class="outline-button justify-center" type="button">Cancel</button>
+          </div>
+        </div>
+
+        <div id="collection-delete-confirmation" class="delete-confirmation mt-4" role="group" aria-labelledby="collection-delete-title" hidden>
+          <div>
+            <h2 id="collection-delete-title" class="text-base font-semibold">Delete this collection?</h2>
+            <p class="mt-1 text-sm text-[#755f50]">This removes the shelf, not the recipes and not your brew history.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="collection-delete-cancel" class="outline-button justify-center" type="button">Keep collection</button>
+            <button id="collection-delete-confirm" class="danger-button justify-center" type="button">Delete permanently</button>
+          </div>
+        </div>
+
+        <p id="collection-status" class="journal-status mt-4" role="status" aria-live="polite"></p>
+        <p id="collection-order-hint" class="collection-order-hint mt-4" hidden>Use the arrow buttons to set the order you like. New recipes are added at the end.</p>
+
+        <ol id="collection-recipe-list" class="collection-recipe-list mt-4" aria-label="Recipes in this collection"></ol>
+
+        <div id="collection-empty" class="empty-state mt-5" hidden>
+          <span aria-hidden="true">＋</span>
+          <strong>This collection is empty</strong>
+          <p>Add a few recipes and they will keep their order here.</p>
+          <button id="collection-empty-action" class="outline-button" type="button">Add recipes from the library</button>
+        </div>
+
+        <p id="collection-error" class="journal-error mt-5" role="alert" hidden></p>
       </section>
 
       <section id="glossary-screen" class="screen" data-screen="glossary" data-active="false" aria-labelledby="glossary-title" hidden>
@@ -598,6 +725,33 @@
       <p id="term-panel-detail" class="term-panel-detail"></p>
       <div id="term-panel-related" class="term-panel-related"></div>
       <button id="term-panel-done" class="outline-button mt-6 w-full justify-center" type="button">Browse all terms</button>
+    </div>
+  </div>
+
+  <div id="collection-picker" class="term-panel" role="dialog" aria-modal="true" aria-labelledby="collection-picker-title" hidden>
+    <button id="collection-picker-backdrop" class="term-panel-backdrop" type="button" tabindex="-1" aria-label="Close collections"></button>
+    <div class="term-panel-card">
+      <div class="term-panel-handle" aria-hidden="true"></div>
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="eyebrow">Save this recipe</p>
+          <h2 id="collection-picker-title" tabindex="-1" class="mt-1 text-2xl font-semibold tracking-[-0.04em]">Add to a collection</h2>
+        </div>
+        <button id="collection-picker-close" class="icon-button un-touch-target" type="button" aria-label="Close collections">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p id="collection-picker-recipe" class="term-panel-summary"></p>
+      <div id="collection-picker-list" class="collection-picker-list"></div>
+      <form id="collection-picker-create" class="collection-create mt-4" aria-label="Create a collection from here">
+        <label class="journal-field">
+          <span>New collection</span>
+          <input id="collection-picker-name" maxlength="60" placeholder="Staging demo: Weekday mornings" autocomplete="off">
+        </label>
+        <button class="primary-button justify-center" type="submit">Create and add</button>
+      </form>
+      <p id="collection-picker-error" class="journal-form-error mt-3" role="alert" hidden></p>
+      <button id="collection-picker-done" class="outline-button mt-4 w-full justify-center" type="button">Done</button>
     </div>
   </div>
 

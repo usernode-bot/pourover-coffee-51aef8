@@ -77,6 +77,62 @@
       ]
     },
     {
+      "name": "Library filters to favorites",
+      "path": "/?favorites=1&demo=1",
+      "expectText": "Favorites",
+      "expectSelector": "#recipe-list .brew-recipe-card[data-recipe-id=\"v60-sweet-pulse\"]"
+    },
+    {
+      "id": "shelf.favorites",
+      "name": "Favorites shelf lists saved recipes",
+      "path": "/?shelf=favorites&demo=1",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "collection-store.js",
+        "server.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#shelf-recipe-list .brew-recipe-card[data-recipe-id=\"switch-hybrid\"]"
+    },
+    {
+      "name": "Recently brewed shelf shows past brews",
+      "path": "/?shelf=brewed&demo=1",
+      "expectSelector": "#shelf-recipe-list .brew-recipe-card[data-recipe-id]"
+    },
+    {
+      "id": "shelf.collections",
+      "name": "Collections view lists personal collections",
+      "path": "/?shelf=collections&demo=1",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "collection-store.js",
+        "server.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#collection-list .collection-row"
+    },
+    {
+      "id": "collection.detail",
+      "name": "A collection keeps its recipe order",
+      "path": "/?collection=demo-weekday&demo=1",
+      "expectText": "Bright two-pour",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "collection-store.js",
+        "server.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#collection-recipe-list .collection-recipe-row[data-recipe-id]"
+    },
+    {
+      "name": "Collection picker opens from a recipe",
+      "path": "/?recipe=v60-bright&shot=picker&demo=1",
+      "expectSelector": "#collection-picker:not([hidden])"
+    },
+    {
       "name": "Glossary browses every term",
       "path": "/?glossary=1",
       "expectSelector": "#glossary-list [data-term]"
