@@ -92,7 +92,8 @@
             <span class="block text-sm font-semibold tracking-tight text-[#2c211a]">Pourover Coffee</span>
           </span>
         </button>
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 sm:gap-3">
+          <button id="journal-button" class="text-button un-touch-target" type="button">Journal</button>
           <button id="glossary-button" class="text-button un-touch-target" type="button">Glossary</button>
           <button id="about-button" class="text-button un-touch-target" type="button">About</button>
         </div>
@@ -387,11 +388,190 @@
             <p class="eyebrow mt-5">Brew complete</p>
             <h2 class="mt-1 text-3xl font-semibold tracking-[-0.04em]">Give it a gentle swirl.</h2>
             <p class="mx-auto mt-3 max-w-md text-sm leading-6 text-[#725f50]">Let the cup cool for a moment, then taste. Keep what worked and adjust one thing next time.</p>
-            <div class="mt-6 grid gap-3 sm:grid-cols-2">
-              <button id="brew-again" class="primary-button justify-center" type="button">Brew again</button>
-              <button id="return-to-recipe" class="outline-button" type="button">Back to recipe</button>
+            <div class="mt-6 grid gap-3 sm:grid-cols-3">
+              <button id="save-brew-notes" class="primary-button justify-center" type="button">Save brew notes</button>
+              <button id="brew-again" class="outline-button justify-center" type="button">Brew again</button>
+              <button id="return-to-recipe" class="outline-button justify-center" type="button">Back to recipe</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section id="journal-screen" class="screen" data-screen="journal" data-active="false" aria-labelledby="journal-title" hidden>
+        <div class="journal-hero rounded-[2rem] p-5 sm:p-8">
+          <div class="relative z-10 max-w-2xl">
+            <p class="eyebrow">Private by default</p>
+            <h1 id="journal-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Brew journal</h1>
+            <p class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base">Remember the coffee, settings, and result behind each cup. Every entry keeps the exact recipe revision you brewed.</p>
+          </div>
+          <div class="journal-hero-mark" aria-hidden="true">✎</div>
+        </div>
+
+        <div class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="eyebrow">Your history</p>
+            <p id="journal-count" class="mt-1 text-sm font-semibold text-[#6d5849]" aria-live="polite">Loading brews</p>
+          </div>
+          <button id="journal-new" class="primary-button justify-center" type="button">Log a brew</button>
+        </div>
+
+        <form id="journal-filters" class="journal-filter-grid mt-4" aria-label="Filter brew journal">
+          <label class="filter-field journal-search-field">
+            <span>Search notes or coffee</span>
+            <input name="q" type="search" maxlength="120" placeholder="Coffee, roaster, or note">
+          </label>
+          <label class="filter-field"><span>Method</span><select name="methodId"></select></label>
+          <label class="filter-field"><span>Recipe</span><select name="recipeId"></select></label>
+          <button id="journal-clear-filters" class="outline-button justify-center" type="button">Clear filters</button>
+        </form>
+
+        <p id="journal-status" class="journal-status mt-4" role="status" aria-live="polite"></p>
+        <div id="journal-list" class="mt-4 grid gap-3 md:grid-cols-2" aria-label="Brew journal entries"></div>
+
+        <div id="journal-empty" class="empty-state mt-5" hidden>
+          <span aria-hidden="true">✎</span>
+          <h2>No brews recorded yet</h2>
+          <p id="journal-empty-copy">Finish a guided brew or log one manually to begin learning from each cup.</p>
+          <button id="journal-empty-action" class="outline-button" type="button">Log your first brew</button>
+        </div>
+
+        <div id="journal-error" class="journal-error mt-5" role="alert" hidden>
+          <h2>Journal unavailable</h2>
+          <p id="journal-error-copy">Your brew history could not be loaded.</p>
+          <button id="journal-retry" class="outline-button" type="button">Try again</button>
+        </div>
+      </section>
+
+      <section id="journal-detail-screen" class="screen" data-screen="journal-detail" data-active="false" aria-labelledby="journal-detail-title" hidden>
+        <div class="journal-detail-hero rounded-[2rem] p-5 sm:p-8">
+          <div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p id="journal-detail-method" class="eyebrow"></p>
+              <h1 id="journal-detail-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl"></h1>
+              <p id="journal-detail-date" class="mt-2 text-sm text-[#756456]"></p>
+            </div>
+            <span id="journal-detail-version" class="snapshot-badge"></span>
+          </div>
+          <p id="journal-demo-badge" class="demo-badge mt-5" hidden>Read-only staging demo</p>
+        </div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <div class="space-y-4">
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="journal-snapshot-heading">
+              <p class="eyebrow">Immutable record</p>
+              <h2 id="journal-snapshot-heading" class="mt-1 text-xl font-semibold tracking-tight">Brew snapshot</h2>
+              <p id="journal-version-status" class="mt-2 text-xs leading-5 text-[#806d5e]"></p>
+              <dl id="journal-snapshot-details" class="mt-3 divide-y divide-[#e6ddd1]"></dl>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="journal-taste-heading">
+              <p class="eyebrow">Cup result</p>
+              <h2 id="journal-taste-heading" class="mt-1 text-xl font-semibold tracking-tight">Taste notes</h2>
+              <div id="journal-taste-scores" class="taste-score-list mt-4"></div>
+            </section>
+          </div>
+
+          <div class="space-y-4">
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="journal-setup-heading">
+              <p class="eyebrow">What you used</p>
+              <h2 id="journal-setup-heading" class="mt-1 text-xl font-semibold tracking-tight">Coffee and setup</h2>
+              <dl id="journal-setup-details" class="mt-3 divide-y divide-[#e6ddd1]"></dl>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5" aria-labelledby="journal-notes-heading">
+              <p class="eyebrow">What happened</p>
+              <h2 id="journal-notes-heading" class="mt-1 text-xl font-semibold tracking-tight">Notes</h2>
+              <p id="journal-detail-notes" class="journal-prose mt-3"></p>
+              <div class="mt-5 rounded-2xl bg-[#f1e9df] p-4">
+                <p class="text-[10px] font-bold uppercase tracking-[0.16em] text-[#8e7766]">Change next time</p>
+                <p id="journal-detail-change" class="journal-prose mt-2"></p>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div id="journal-detail-actions" class="mt-5 grid gap-3 sm:grid-cols-3">
+          <button id="journal-repeat" class="primary-button justify-center" type="button">Brew again</button>
+          <button id="journal-edit" class="outline-button justify-center" type="button">Edit notes</button>
+          <button id="journal-delete" class="danger-button justify-center" type="button">Delete entry</button>
+        </div>
+
+        <div id="journal-delete-confirmation" class="delete-confirmation mt-4" role="group" aria-labelledby="delete-confirmation-title" hidden>
+          <div>
+            <h2 id="delete-confirmation-title" class="text-base font-semibold">Delete this journal entry?</h2>
+            <p class="mt-1 text-sm text-[#755f50]">This removes the private record. It does not change the recipe.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="journal-delete-cancel" class="outline-button justify-center" type="button">Keep entry</button>
+            <button id="journal-delete-confirm" class="danger-button justify-center" type="button">Delete permanently</button>
+          </div>
+        </div>
+        <p id="journal-detail-error" class="journal-form-error mt-4" role="alert" hidden></p>
+      </section>
+
+      <section id="journal-form-screen" class="screen" data-screen="journal-form" data-active="false" aria-labelledby="journal-form-title" hidden>
+        <div class="mx-auto max-w-4xl">
+          <div class="journal-form-heading rounded-[2rem] p-5 sm:p-8">
+            <p id="journal-form-kicker" class="eyebrow">New journal entry</p>
+            <h1 id="journal-form-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Log a brew</h1>
+            <p id="journal-form-intro" class="mt-3 max-w-2xl text-sm leading-6 text-[#66564a]">Record what you used and how the cup tasted. Only the recipe, dose, and brew time are required.</p>
+          </div>
+
+          <form id="journal-entry-form" class="mt-4 space-y-4" novalidate>
+            <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="journal-form-recipe-heading">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p class="eyebrow">Exact starting point</p>
+                  <h2 id="journal-form-recipe-heading" class="mt-1 text-xl font-semibold tracking-tight">Recipe and dose</h2>
+                </div>
+                <p id="journal-form-version" class="snapshot-badge"></p>
+              </div>
+              <p id="journal-form-snapshot-note" class="mt-2 text-xs leading-5 text-[#806d5e]">Saving creates an immutable snapshot of this recipe revision.</p>
+              <div class="journal-form-grid mt-5">
+                <label class="journal-field journal-field-wide"><span>Recipe</span><select id="journal-form-recipe" name="recipeId" required></select></label>
+                <label class="journal-field"><span>Coffee dose (g)</span><input id="journal-form-dose" name="coffee" type="number" min="5" max="60" step="1" inputmode="numeric" required></label>
+                <label class="journal-field"><span>Brewed at</span><input id="journal-form-brewed-at" name="brewedAt" type="datetime-local" required></label>
+              </div>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="journal-form-coffee-heading">
+              <p class="eyebrow">Coffee and setup</p>
+              <h2 id="journal-form-coffee-heading" class="mt-1 text-xl font-semibold tracking-tight">What did you use?</h2>
+              <div class="journal-form-grid mt-5">
+                <label class="journal-field"><span>Coffee</span><input name="coffeeName" maxlength="120" placeholder="Coffee or lot name"></label>
+                <label class="journal-field"><span>Roaster</span><input name="roaster" maxlength="120" placeholder="Roaster name"></label>
+                <label class="journal-field"><span>Process</span><input name="process" maxlength="80" placeholder="Washed, natural, honey"></label>
+                <label class="journal-field"><span>Roast date</span><input name="roastDate" type="date"></label>
+                <label class="journal-field"><span>Grinder</span><input name="grinder" maxlength="120" placeholder="Grinder model"></label>
+                <label class="journal-field"><span>Grind setting</span><input name="grindSetting" maxlength="80" placeholder="Setting or clicks"></label>
+                <label class="journal-field"><span>Water</span><input name="water" maxlength="160" placeholder="Filtered, mineral recipe, or source"></label>
+                <label class="journal-field"><span>Gear</span><input name="gear" maxlength="200" placeholder="Brewer, filter, kettle"></label>
+              </div>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="journal-form-taste-heading">
+              <p class="eyebrow">Taste the cup</p>
+              <h2 id="journal-form-taste-heading" class="mt-1 text-xl font-semibold tracking-tight">How did it turn out?</h2>
+              <p class="mt-2 text-xs leading-5 text-[#806d5e]">Ratings are optional. Use 1 for low and 5 for high.</p>
+              <div class="rating-grid mt-5">
+                <label class="journal-field"><span>Sweetness</span><select name="sweetness" data-rating></select></label>
+                <label class="journal-field"><span>Acidity</span><select name="acidity" data-rating></select></label>
+                <label class="journal-field"><span>Body</span><select name="body" data-rating></select></label>
+                <label class="journal-field"><span>Clarity</span><select name="clarity" data-rating></select></label>
+                <label class="journal-field"><span>Overall result</span><select name="overall" data-rating></select></label>
+              </div>
+              <div class="mt-5 grid gap-4">
+                <label class="journal-field"><span>Notes</span><textarea name="notes" maxlength="2000" rows="5" placeholder="What stood out as the cup cooled?"></textarea></label>
+                <label class="journal-field"><span>Change next time</span><textarea name="changeNextTime" maxlength="500" rows="3" placeholder="Choose one variable to adjust next time."></textarea></label>
+              </div>
+            </section>
+
+            <p id="journal-form-error" class="journal-form-error" role="alert" hidden></p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button id="journal-form-save" class="primary-button justify-center" type="submit">Save journal entry</button>
+              <button id="journal-form-cancel" class="outline-button justify-center" type="button">Cancel</button>
+            </div>
+          </form>
         </div>
       </section>
     </main>

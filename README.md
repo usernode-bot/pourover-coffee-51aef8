@@ -25,6 +25,14 @@ brewing.
 - Keeps the next action visible with its scheduled time, countdown, scaled
   water target, and a preparation cue.
 - Provides pause, resume, previous, next, reset, and brew-again controls.
+- Saves private brew journal entries from a completed timer or a manual form,
+  including coffee, roaster, process, roast date, grinder, setting, water,
+  gear, taste ratings, freeform notes, and one change to try next time.
+- Lets a brewer filter, inspect, edit, delete, and repeat journal entries. Each
+  entry keeps an immutable snapshot of the exact recipe revision and scaled
+  dose used for that brew.
+- Versions recipes under stable ids. Current recipe links stay canonical while
+  historical journal entries can still open and repeat an older revision.
 - Remembers a preferred dose for each recipe in local storage. Existing
   method-level preferences remain valid as a fallback.
 - Exposes deterministic recipe and timer URLs for Homeroom proposal checks.
@@ -45,21 +53,26 @@ npm start
 ```
 
 Homeroom supplies authentication and runtime environment variables in hosted
-deployments. The app keeps the scaffold's deny-by-default JWT verification and
-uses no database for its current feature set.
+deployments. The app keeps the scaffold's deny-by-default JWT verification.
+Set `DATABASE_URL` to a PostgreSQL database to enable the brew journal. Its
+boot-time schema is idempotent and the journal table is marked
+`staging:private`, so staged proposals never receive production journal rows.
 
 ## Structure
 
-- `public/index.html`: the library, method, recipe, and timer application
-  shell.
+- `public/index.html`: the library, method, recipe, timer, and journal
+  application shell.
 - `public/app.css`: the coffee-and-paper visual system.
-- `public/recipes.js`: method metadata, recipe definitions, tag taxonomy,
-  filtering, legacy-link resolution, and dose-scaling logic.
+- `public/recipes.js`: method metadata, append-only recipe revisions, immutable
+  snapshot creation, tag taxonomy, filtering, legacy-link resolution, and
+  dose-scaling logic.
 - `public/glossary.js`: glossary copy, category grouping, search, and the
   mappings from taxonomy values and timer steps to terms.
-- `public/app.js`: navigation, rendering, local preferences, and the timer.
-- `server.js`: Homeroom authentication, static serving, deep links, and
-  graceful shutdown.
+- `public/app.js`: navigation, rendering, local preferences, timer, and journal
+  interactions.
+- `journal-store.js`: validated and user-scoped PostgreSQL journal storage.
+- `server.js`: Homeroom authentication, journal API, static serving, deep
+  links, and graceful shutdown.
 - `tests/glossary.test.js`: content-integrity checks for glossary copy,
   taxonomy coverage, and step mappings.
 - `dapp.json`: the app icon and proposal checks.

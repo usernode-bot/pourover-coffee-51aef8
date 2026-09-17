@@ -60,7 +60,10 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
 - Recipe definitions and scaling logic live in `public/recipes.js` so the
   browser and Node unit tests exercise the same source.
 - Methods and recipes are separate records. Method ids identify brewers;
-  stable recipe ids identify an exact set of dose, ratio, steps, and tags.
+  stable recipe ids identify a recipe across revisions. Each immutable recipe
+  revision has a `<recipe-id>@<version>` id and the latest revision is exposed
+  through `RECIPES`. Never change an existing revision in place: append the
+  next numbered revision to `RECIPE_REVISIONS`.
   Legacy `?recipe=<method-id>` and `?brew=<method-id>` URLs resolve to that
   method's declared default recipe.
 - Recipe discovery uses the typed `TAG_TAXONOMY` facets in
@@ -72,6 +75,11 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
   action card. Preparation begins 15 seconds before the step unless that step
   sets a longer `prepareLeadSeconds` value; the final 10 seconds use the
   strongest visible cue.
+- Journal entries are private PostgreSQL records. Keep
+  `brew_journal_entries` marked `staging:private`, scope every query to the
+  verified Homeroom user id, and preserve `recipe_snapshot` when editable
+  notes or setup fields change. Recipe snapshots are created server-side from
+  a known revision and include the scaled instructions used for that cup.
 - Glossary copy lives in `public/glossary.js`, deliberately separate from
   `public/recipes.js`. Terms are keyed by stable ids, and taxonomy values and
   timer step labels map onto those ids rather than restating definitions.
@@ -82,7 +90,6 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
   and leaves the screen behind it inert while open.
 - Preferred doses are non-sensitive device preferences and stay in
   `localStorage`, keyed by recipe id. Read the previous method-level key as a
-  migration fallback before using the recipe's base dose. The MVP has no
-  server-side user data and needs no database.
+  migration fallback before using the recipe's base dose.
 - Keep the experience calm and practical. Add one brewing variable at a
   time, and frame every recipe as a starting point rather than a rule.
