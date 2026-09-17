@@ -28,6 +28,7 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?filterMethod=v60&roast=light&profile=sweet',
     '/?recipe=v60-bright',
     '/?brew=v60-bright&shot=active',
+    '/?brew=v60-bright&shot=active',
     '/?journal=demo',
     '/?journal=demo&entry=demo-v60',
     '/?journal=new',
@@ -41,13 +42,36 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[2].expectText, 'Sweet pulse');
   assert.equal(manifest.tests[3].expectText, 'Pourover Coffee original');
   assert.equal(manifest.tests[4].expectText, 'Get ready');
-  assert.equal(manifest.tests[5].expectText, 'Staging demo: Finca El Jardín');
-  assert.equal(manifest.tests[6].expectText, 'Brew snapshot');
-  assert.equal(manifest.tests[7].expectText, 'What did you use?');
-  assert.ok(manifest.tests.slice(5, 8).every((entry) => entry.visual));
-  assert.equal(manifest.tests[10].visual, true);
-  assert.equal(manifest.tests[10].id, 'glossary.term-panel');
-  assert.match(manifest.tests[10].expectText, /gas escape/);
+  assert.equal(manifest.tests[5].id, 'brew.focus-mode');
+  assert.equal(manifest.tests[6].expectText, 'Staging demo: Finca El Jardín');
+  assert.equal(manifest.tests[7].expectText, 'Brew snapshot');
+  assert.equal(manifest.tests[8].expectText, 'What did you use?');
+  assert.ok(manifest.tests.slice(6, 9).every((entry) => entry.visual));
+  assert.equal(manifest.tests[11].visual, true);
+  assert.equal(manifest.tests[11].id, 'glossary.term-panel');
+  assert.match(manifest.tests[11].expectText, /gas escape/);
+});
+
+test('the guided brew uses a protected focus shell instead of global navigation', () => {
+  const html = read('public/index.html');
+  const client = read('public/app.js');
+  const styles = read('public/app.css');
+
+  assert.match(html, /id="brew-focus-header"/);
+  assert.match(html, /id="brew-exit"/);
+  assert.match(html, /id="brew-help"/);
+  assert.match(html, /id="brew-exit-confirmation"[^>]+hidden/);
+  assert.match(client, /function isBrewFocusActive\(\)/);
+  assert.match(client, /document\.body\.classList\.toggle\('brew-focus', active\)/);
+  assert.match(client, /header\.inert = active/);
+  assert.match(client, /setBrewExitConfirmation\(true\)/);
+  assert.match(client, /elements\.brewExitConfirm\.focus\(/);
+  assert.match(styles, /\.brew-focus \.app-header \{\n  display: none;/);
+  assert.match(styles, /100dvh/);
+  assert.match(styles, /var\(--un-safe-inset-top, env\(safe-area-inset-top, 0px\)\)/);
+  assert.match(styles, /@media \(max-height: 719px\)/);
+  assert.match(styles, /@media \(orientation: landscape\) and \(max-height: 519px\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
 test('the shell has separate method, discovery, detail, and brew surfaces', () => {

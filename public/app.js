@@ -115,6 +115,14 @@
     timerToggleIcon: document.getElementById('timer-toggle-icon'),
     timerToggleLabel: document.getElementById('timer-toggle-label'),
     resetTimer: document.getElementById('reset-timer'),
+    focusHeader: document.getElementById('brew-focus-header'),
+    focusRecipe: document.getElementById('brew-focus-recipe'),
+    focusDose: document.getElementById('brew-focus-dose'),
+    brewExit: document.getElementById('brew-exit'),
+    brewHelp: document.getElementById('brew-help'),
+    brewExitConfirmation: document.getElementById('brew-exit-confirmation'),
+    brewExitKeep: document.getElementById('brew-exit-keep'),
+    brewExitConfirm: document.getElementById('brew-exit-confirm'),
     brewComplete: document.getElementById('brew-complete'),
     saveBrewNotes: document.getElementById('save-brew-notes'),
     brewAgain: document.getElementById('brew-again'),
@@ -185,6 +193,22 @@
   const DOSE_STORAGE_KEY = 'pourover-coffee:doses:v1';
   const FILTER_PARAM = Object.freeze({ method: 'filterMethod' });
   const APP_TOKEN = new URLSearchParams(window.location.search).get('token') || '';
+  // Focus mode is a navigation shell for the live brew, not a separate
+  // feature: the header swaps when a guided timer is in progress (or armed on
+  // the brew screen) and returns when it completes or exits. Arming the shell
+  // on the not-yet-started brew screen keeps the compact header stable across
+  // the start transition instead of swapping headers mid-tap.
+  function isBrewFocusActive() {
+    return state.screen === 'brew' && !state.timer.completed;
+  }
+
+  function syncFocusMode() {
+    const active = isBrewFocusActive();
+    document.body.classList.toggle('brew-focus', active);
+    const header = document.getElementById('app-header');
+    if (header) header.inert = active;
+  }
+
   const state = {
     screen: 'library',
     method: METHODS[0],
@@ -607,6 +631,7 @@
       elements.back.hidden = screen === 'library';
       window.scrollTo({ top: 0, behavior: 'instant' });
       if (focus) screens[screen].querySelector('h1')?.focus({ preventScroll: true });
+      syncFocusMode();
     };
     if (transition !== 'none' && window.unNative?.transition) {
       window.unNative.transition(mutate, { type: transition });
@@ -1133,6 +1158,8 @@
     elements.brewTitle.textContent = state.scaled.title;
     elements.brewDose.textContent = `${state.scaled.coffee}g coffee · ${state.scaled.water}g water`;
     elements.brewRatio.textContent = `1:${formatRatio(state.scaled.ratio)} · ${state.scaled.temperature}`;
+    elements.focusRecipe.textContent = state.scaled.title;
+    elements.focusDose.textContent = `${state.scaled.coffee}g coffee · ${state.scaled.water}g water`;
     elements.timerTotal.textContent = `of ${formatDuration(state.scaled.totalDuration)}`;
     elements.stepProgress.innerHTML = state.scaled.steps.map((recipeStep, index) => (
       `<span class="progress-dot" data-step-dot="${index}" data-state="upcoming" title="${recipeStep.label}"></span>`
@@ -1178,6 +1205,7 @@
     }
     elements.timerPanel.hidden = state.timer.completed;
     elements.brewComplete.hidden = !state.timer.completed;
+    syncFocusMode();
     if (state.timer.completed) return;
     const timing = getBrewTiming(state.scaled, elapsed);
     const { stepIndex } = timing;
@@ -1270,6 +1298,25 @@
     renderBrewShell();
   }
 
+  // The exit path stays one obvious tap away, but a running or mid-step brew
+  // asks before ending: accidental exits would throw away a cup in progress.
+  function setBrewExitConfirmation(open) {
+    elements.brewExitConfirmation.hidden = !open;
+    if (open) {
+      elements.brewExitConfirm.focus({ preventScroll: true });
+      return;
+    }
+    if (elements.brewExitConfirmation.contains(document.activeElement)) {
+      elements.brewExit.focus({ preventScroll: true });
+    }
+  }
+
+  function exitBrew() {
+    setBrewExitConfirmation(false);
+    state.timer = freshTimer();
+    navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' });
+  }
+
   function openAbout() {
     const content = document.getElementById('about-content').content.firstElementChild.cloneNode(true);
     if (window.unNative?.presentModal) {
@@ -1330,6 +1377,13 @@
   elements.previousStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex - 1));
   elements.nextStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex + 1));
   elements.resetTimer.addEventListener('click', resetTimer);
+  elements.brewExit.addEventListener('click', () => setBrewExitConfirmation(true));
+  elements.brewExitKeep.addEventListener('click', () => setBrewExitConfirmation(false));
+  elements.brewExitConfirm.addEventListener('click', exitBrew);
+  elements.brewHelp.addEventListener('click', () => {
+    setBrewExitConfirmation(false);
+    openGlossary();
+  });
   elements.saveBrewNotes.addEventListener('click', () => openJournalForm({
     recipeRef: state.recipe.revisionId,
     dose: state.scaled.coffee,
@@ -1427,6 +1481,11 @@
     if (event.key === 'Escape' && state.term.open) {
       event.preventDefault();
       closeTerm();
+      return;
+    }
+    if (event.key === 'Escape' && state.screen === 'brew' && !elements.brewExitConfirmation.hidden) {
+      event.preventDefault();
+      setBrewExitConfirmation(false);
     }
   });
   elements.home.addEventListener('click', () => {

@@ -38,6 +38,17 @@
       ]
     },
     {
+      "id": "brew.focus-mode",
+      "name": "Focus mode renders a compact brew header",
+      "path": "/?brew=v60-bright&shot=active",
+      "expectSelector": "#brew-focus-header .brew-focus-recipe",
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
       "id": "journal.history",
       "name": "Brew journal renders private history",
       "path": "/?journal=demo",
