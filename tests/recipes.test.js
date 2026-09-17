@@ -18,6 +18,7 @@ const {
   getPreparationLead,
   getRecipe,
   getRecipeRevision,
+  getRecipeTimeline,
   getRecipesForMethod,
   isCurrentRecipeRevision,
   normalizeFilters,
@@ -117,6 +118,34 @@ test('every recipe step has preparation guidance for upcoming-step previews', ()
   }
 });
 
+test('recipe timelines expose elapsed-from-start boundaries and target ownership', () => {
+  const timeline = getRecipeTimeline(scaleRecipe('v60-bright', 30));
+  assert.equal(timeline.totalDuration, 180);
+  assert.deepEqual(timeline.steps.map((step) => [step.startsAt, step.endsAt]), [
+    [0, 45], [45, 80], [80, 115], [115, 180],
+  ]);
+  assert.deepEqual(timeline.steps.map((step) => step.targetKind), [
+    'action', 'action', 'action', 'context',
+  ]);
+  assert.deepEqual(timeline.steps.map((step) => step.targetDelta), [90, 210, 200, 0]);
+});
+
+test('zero-duration actions have a boundary but never steal the running timer', () => {
+  const recipe = {
+    steps: [
+      { label: 'Open valve', duration: 0, target: 0, preparation: 'Reach for the valve.' },
+      { label: 'Pour', duration: 30, target: 100, preparation: 'Lift the kettle.' },
+      { label: 'Wait', duration: 30, target: 100, preparation: 'Set the kettle down.' },
+    ],
+  };
+  const timeline = getRecipeTimeline(recipe);
+  assert.deepEqual(timeline.steps.map((step) => [step.startsAt, step.endsAt]), [
+    [0, 0], [0, 30], [30, 60],
+  ]);
+  assert.equal(getBrewTiming(recipe, 0).currentStep.label, 'Pour');
+  assert.equal(getBrewTiming(recipe, 30).currentStep.label, 'Wait');
+});
+
 test('brew timing retains next-step boundaries for an exact recipe', () => {
   const scaled = scaleRecipe('v60-bright', 30);
   const timing = getBrewTiming(scaled, 34);
@@ -125,6 +154,9 @@ test('brew timing retains next-step boundaries for an exact recipe', () => {
   assert.equal(timing.nextStartsAt, 45);
   assert.equal(timing.secondsUntilNext, 11);
   assert.equal(timing.preparationLeadSeconds, DEFAULT_PREPARATION_LEAD_SECONDS);
+  assert.equal(timing.currentStep.label, 'Bloom');
+  assert.equal(timing.nextStep.label, 'First pour');
+  assert.equal(timing.nextStep.targetKind, 'action');
   assert.equal(timing.isPreparing, true);
   assert.equal(timing.isImminent, false);
   assert.equal(scaled.steps[timing.nextStepIndex].target, 300);

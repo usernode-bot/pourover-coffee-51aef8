@@ -26,10 +26,24 @@
       "expectText": "Pourover Coffee original"
     },
     {
+      "id": "recipe.timeline",
+      "name": "Recipe steps show elapsed-from-start timing",
+      "path": "/?recipe=clever-water-first&shot=timeline",
+      "expectText": "Start at 0:00",
+      "expectSelector": ".recipe-step-timing",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
       "id": "brew.guided-timer",
       "name": "Guided timer renders an active brew",
       "path": "/?brew=v60-bright&shot=active",
-      "expectText": "Get ready",
+      "expectText": "Now",
+      "expectSelector": "body.brew-focus #timer-panel[data-focus=\"active\"]",
       "visual": true,
       "impact": [
         "public/**",

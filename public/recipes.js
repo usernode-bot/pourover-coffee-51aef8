@@ -487,35 +487,64 @@
     return Math.max(IMMINENT_PREPARATION_SECONDS, Math.round(requested));
   }
 
+  function getRecipeTimeline(recipeOrId) {
+    const recipe = typeof recipeOrId === 'string'
+      ? (getRecipeRevision(recipeOrId) || getRecipe(recipeOrId))
+      : recipeOrId;
+    let startsAt = 0;
+    let previousTarget = 0;
+    const steps = recipe.steps.map((recipeStep, index) => {
+      const duration = Math.max(0, Number(recipeStep.duration) || 0);
+      const target = Math.max(0, Number(recipeStep.target) || 0);
+      const targetDelta = Math.max(0, target - previousTarget);
+      const timelineStep = {
+        ...recipeStep,
+        index,
+        duration,
+        target,
+        previousTarget,
+        targetDelta,
+        targetKind: targetDelta > 0 ? 'action' : target > 0 ? 'context' : 'none',
+        startsAt,
+        endsAt: startsAt + duration,
+      };
+      startsAt = timelineStep.endsAt;
+      previousTarget = target;
+      return timelineStep;
+    });
+    return { steps, totalDuration: startsAt };
+  }
+
   function getStepStart(recipeOrId, index) {
-    const recipe = typeof recipeOrId === 'string' ? getRecipe(recipeOrId) : recipeOrId;
-    const safeIndex = Math.max(0, Math.min(recipe.steps.length, Number(index) || 0));
-    return recipe.steps.slice(0, safeIndex).reduce((sum, recipeStep) => sum + recipeStep.duration, 0);
+    const timeline = getRecipeTimeline(recipeOrId);
+    const safeIndex = Math.max(0, Math.min(timeline.steps.length, Number(index) || 0));
+    return safeIndex === timeline.steps.length
+      ? timeline.totalDuration
+      : timeline.steps[safeIndex].startsAt;
   }
 
   function getBrewTiming(recipeOrId, elapsedValue) {
-    const recipe = typeof recipeOrId === 'string' ? getRecipe(recipeOrId) : recipeOrId;
-    const totalDuration = recipe.totalDuration || recipe.steps.reduce((sum, recipeStep) => sum + recipeStep.duration, 0);
+    const timeline = getRecipeTimeline(recipeOrId);
+    const { totalDuration } = timeline;
     const numericElapsed = Number(elapsedValue);
     const elapsed = Math.max(0, Math.min(totalDuration, Number.isFinite(numericElapsed) ? numericElapsed : 0));
-    let stepIndex = recipe.steps.length - 1;
-    let stepStartsAt = getStepStart(recipe, stepIndex);
-    let boundary = 0;
-    for (let index = 0; index < recipe.steps.length; index += 1) {
-      const startsAt = boundary;
-      boundary += recipe.steps[index].duration;
-      if (elapsed < boundary) {
+    let stepIndex = timeline.steps.length - 1;
+    for (let index = 0; index < timeline.steps.length; index += 1) {
+      if (elapsed < timeline.steps[index].endsAt) {
         stepIndex = index;
-        stepStartsAt = startsAt;
         break;
       }
     }
-    const nextStepIndex = stepIndex < recipe.steps.length - 1 ? stepIndex + 1 : null;
-    const nextStartsAt = nextStepIndex === null ? null : stepStartsAt + recipe.steps[stepIndex].duration;
+    const currentStep = timeline.steps[stepIndex];
+    const nextStepIndex = stepIndex < timeline.steps.length - 1 ? stepIndex + 1 : null;
+    const nextStep = nextStepIndex === null ? null : timeline.steps[nextStepIndex];
+    const stepStartsAt = currentStep.startsAt;
+    const nextStartsAt = nextStep?.startsAt ?? null;
     const secondsUntilNext = nextStartsAt === null ? null : Math.max(0, nextStartsAt - elapsed);
-    const preparationLeadSeconds = nextStepIndex === null ? null : getPreparationLead(recipe.steps[nextStepIndex]);
+    const preparationLeadSeconds = nextStep === null ? null : getPreparationLead(nextStep);
     return {
-      elapsed, stepIndex, stepStartsAt, nextStepIndex, nextStartsAt, secondsUntilNext, preparationLeadSeconds,
+      elapsed, totalDuration, stepIndex, stepStartsAt, currentStep,
+      nextStepIndex, nextStartsAt, nextStep, secondsUntilNext, preparationLeadSeconds,
       isPreparing: secondsUntilNext !== null && secondsUntilNext <= preparationLeadSeconds,
       isImminent: secondsUntilNext !== null && secondsUntilNext <= IMMINENT_PREPARATION_SECONDS,
       isFinalStep: nextStepIndex === null,
@@ -534,7 +563,7 @@
     TAG_KEYS, TAG_TAXONOMY,
     clampCoffee, createRecipeSnapshot, filterRecipes, formatDuration, getBrewTiming,
     getMethod, getPreparationLead, getRecipe, getRecipeRevision, getRecipesForMethod,
-    getStepStart, getTagLabel, isCurrentRecipeRevision, normalizeFilters,
+    getRecipeTimeline, getStepStart, getTagLabel, isCurrentRecipeRevision, normalizeFilters,
     resolveRecipeId, scaleRecipe,
   };
 });
