@@ -102,3 +102,9 @@ Chemex, and AeroPress.
   migration fallback before using the recipe's base dose.
 - Keep the experience calm and practical. Add one brewing variable at a
   time, and frame every recipe as a starting point rather than a rule.
+- Brew adjustment guidance is deterministic and recipe-aware. Keep the
+  controlled symptom rules in `public/adjustments.js`, recommend only one
+  variable at a time, name what stays unchanged, and treat conflicting or
+  unsupported inputs as a reason to ask for a dominant symptom rather than
+  guessing. Recommendations never mutate a journal entry or recipe until the
+  brewer explicitly saves through the existing controls.

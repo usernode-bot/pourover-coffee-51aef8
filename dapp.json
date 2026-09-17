@@ -78,6 +78,21 @@
       ]
     },
     {
+      "id": "journal.adjustment",
+      "name": "A journaled cup gets one guided next experiment",
+      "path": "/?journal=demo&entry=demo-v60&adjust=sour",
+      "expectText": "Try one small grind step finer",
+      "expectSelector": "#journal-adjustment-result:not([hidden])",
+      "visual": true,
+      "impact": [
+        "public/adjustments.js",
+        "public/app.js",
+        "public/index.html",
+        "public/app.css",
+        "dapp.json"
+      ]
+    },
+    {
       "id": "journal.form",
       "name": "Manual brew journal form renders",
       "path": "/?journal=new",

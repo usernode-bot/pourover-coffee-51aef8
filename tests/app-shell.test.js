@@ -31,6 +31,7 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?brew=v60-bright&shot=active',
     '/?journal=demo',
     '/?journal=demo&entry=demo-v60',
+    '/?journal=demo&entry=demo-v60&adjust=sour',
     '/?journal=new',
     '/?favorites=1&demo=1',
     '/?shelf=favorites&demo=1',
@@ -60,22 +61,24 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[5].expectText, 'Now');
   assert.equal(manifest.tests[6].expectText, 'Staging demo: Finca El Jardín');
   assert.equal(manifest.tests[7].expectText, 'Brew snapshot');
-  assert.equal(manifest.tests[8].expectText, 'What did you use?');
-  assert.ok(manifest.tests.slice(6, 9).every((entry) => entry.visual));
-  assert.equal(manifest.tests[17].visual, true);
-  assert.equal(manifest.tests[17].id, 'glossary.term-panel');
-  assert.match(manifest.tests[17].expectText, /gas escape/);
-  assert.equal(manifest.tests[18].expectText, '3 recipes for AeroPress');
-  assert.equal(manifest.tests[19].id, 'manual.aeropress-recipe');
-  assert.equal(manifest.tests[20].id, 'manual.aeropress-timer');
-  assert.ok(manifest.tests.slice(19, 21).every((entry) => entry.visual));
-  assert.deepEqual(manifest.tests.slice(21).map((entry) => entry.id), [
+  assert.equal(manifest.tests[8].id, 'journal.adjustment');
+  assert.equal(manifest.tests[8].expectText, 'Try one small grind step finer');
+  assert.equal(manifest.tests[9].expectText, 'What did you use?');
+  assert.ok(manifest.tests.slice(6, 10).every((entry) => entry.visual));
+  assert.equal(manifest.tests[18].visual, true);
+  assert.equal(manifest.tests[18].id, 'glossary.term-panel');
+  assert.match(manifest.tests[18].expectText, /gas escape/);
+  assert.equal(manifest.tests[19].expectText, '3 recipes for AeroPress');
+  assert.equal(manifest.tests[20].id, 'manual.aeropress-recipe');
+  assert.equal(manifest.tests[21].id, 'manual.aeropress-timer');
+  assert.ok(manifest.tests.slice(20, 22).every((entry) => entry.visual));
+  assert.deepEqual(manifest.tests.slice(22).map((entry) => entry.id), [
     'personal-recipes.library',
     'personal-recipes.lineage',
     'personal-recipes.editor',
     'personal-recipes.timer',
   ]);
-  assert.ok(manifest.tests.slice(21).every((entry) => entry.visual));
+  assert.ok(manifest.tests.slice(22).every((entry) => entry.visual));
 });
 
 test('private recipe screens expose creation, lineage, revision, and lifecycle controls', () => {
@@ -183,6 +186,22 @@ test('the private journal exposes history, detail, and edit surfaces from comple
   assert.match(store, /recipe_snapshot JSONB NOT NULL/);
 });
 
+test('journal detail exposes deterministic one-variable adjustment guidance', () => {
+  const html = read('public/index.html');
+  const client = read('public/app.js');
+  const styles = read('public/app.css');
+
+  assert.match(html, /src="\/adjustments\.js"/);
+  assert.match(html, /id="journal-adjustment-symptoms"/);
+  assert.match(html, /id="journal-adjustment-result"[^>]+hidden/);
+  assert.match(html, /id="journal-adjustment-status"[^>]+aria-live="polite"/);
+  assert.match(client, /recommendAdjustment\(\{/);
+  assert.match(client, /changeNextTime: recommendation\.change/);
+  assert.match(client, /openPersonalRecipeForm\(\{ source: adjusted, parentRecipeRef \}\)/);
+  assert.match(client, /params\.get\('adjust'\)/);
+  assert.match(styles, /\.adjustment-symptoms button\[aria-pressed="true"\]/);
+});
+
 test('recipe navigation retains exact historical revision links', () => {
   const source = read('public/app.js');
   assert.match(source, /recipeRouteReference\(recipe\)/);
@@ -218,7 +237,7 @@ test('the timer keeps its step label button alive across ticks', () => {
 });
 
 test('user-facing product files contain no em dash encoding', () => {
-  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'server.js', 'journal-store.js', 'personal-recipe-store.js', 'dapp.json']) {
+  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'public/adjustments.js', 'server.js', 'journal-store.js', 'personal-recipe-store.js', 'dapp.json']) {
     const source = read(file);
     assert.doesNotMatch(source, /—|&mdash;|&#8212;|\\u2014/, file);
   }
