@@ -31,7 +31,7 @@ brewing.
 - Lets a brewer filter, inspect, edit, delete, and repeat journal entries. Each
   entry keeps an immutable snapshot of the exact recipe revision and scaled
   dose used for that brew.
-- Keeps a private shelf: star any recipe as a favorite, find the recipes you
+- Keeps a private shelf: open a recipe and favorite it, find the recipes you
   brewed most recently, and arrange personal collections that preserve the
   order you set. Favorites and collections follow a recipe when it gains a new
   revision, because membership is keyed by the stable recipe id.

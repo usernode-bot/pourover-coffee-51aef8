@@ -401,22 +401,19 @@
     const scaled = scaleRecipe(recipe, selectedDose(recipe));
     const tags = primaryTags(recipe).map((tag) => `<span class="recipe-tag">${tag}</span>`).join('');
     return `
-      <div class="brew-recipe-shell" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
-        <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}">
-          <span class="brew-recipe-topline">
-            <span>${method.name}</span>
-            <span>1:${formatRatio(recipe.ratio)} · ${formatDuration(scaled.totalDuration)}</span>
-          </span>
-          <span class="brew-recipe-title">${recipe.title}</span>
-          <span class="brew-recipe-summary">${recipe.summary}</span>
-          <span class="recipe-tags" aria-label="Recipe tags">${tags}</span>
-          <span class="brew-recipe-footer">
-            <span>${recipe.difficulty} · ${recipe.attribution.label}</span>
-            <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
-          </span>
-        </button>
-        ${favoriteToggleHtml(recipe.id, recipe.title)}
-      </div>`;
+      <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
+        <span class="brew-recipe-topline">
+          <span>${method.name}</span>
+          <span>1:${formatRatio(recipe.ratio)} · ${formatDuration(scaled.totalDuration)}</span>
+        </span>
+        <span class="brew-recipe-title">${recipe.title}</span>
+        <span class="brew-recipe-summary">${recipe.summary}</span>
+        <span class="recipe-tags" aria-label="Recipe tags">${tags}</span>
+        <span class="brew-recipe-footer">
+          <span>${recipe.difficulty} · ${recipe.attribution.label}</span>
+          <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+        </span>
+      </button>`;
   }
 
   function renderRecipeCards(container, recipes) {
@@ -1083,18 +1080,11 @@
     }
   }
 
-  // Keep every heart on screen consistent with one source of truth, so the
-  // library, method, detail, and collection views never disagree.
+  // Favoriting happens on the recipe screen only, so the recipe page's own
+  // control is the one piece of favorite state that needs syncing. The
+  // library's shelf filter reads the same list rather than a card's heart.
   function syncShelfUi() {
     const favorites = favoriteIdSet();
-    document.querySelectorAll('[data-favorite-toggle]').forEach((button) => {
-      const active = favorites.has(button.dataset.recipeId);
-      button.setAttribute('aria-pressed', String(active));
-      button.classList.toggle('is-favorite', active);
-      const label = button.querySelector('.favorite-toggle-label');
-      if (label) label.textContent = active ? 'Saved' : 'Favorite';
-      button.setAttribute('aria-label', `${active ? 'Remove' : 'Add'} ${button.dataset.recipeTitle || 'recipe'} ${active ? 'from' : 'to'} favorites`);
-    });
     const detailFavorite = state.recipe && favorites.has(state.recipe.id);
     elements.recipeFavoriteButton.setAttribute('aria-pressed', String(Boolean(detailFavorite)));
     elements.recipeFavoriteButton.classList.toggle('is-favorite', Boolean(detailFavorite));
@@ -1173,31 +1163,22 @@
     };
   }
 
-  function favoriteToggleHtml(recipeId, title) {
-    const active = isFavoriteRecipe(recipeId);
-    return `<button class="favorite-toggle${active ? ' is-favorite' : ''}" type="button" data-favorite-toggle data-recipe-id="${escapeHtml(recipeId)}" data-recipe-title="${escapeHtml(title)}" aria-pressed="${active}" aria-label="${active ? 'Remove' : 'Add'} ${escapeHtml(title)} ${active ? 'from' : 'to'} favorites"><span aria-hidden="true">${active ? '♥' : '♡'}</span></button>`;
-  }
-
   function shelfRecipeCard(recipe) {
     const method = getMethod(recipe.methodId);
-    const favorite = isFavoriteRecipe(recipe.id);
     return `
-      <div class="shelf-recipe-shell" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
-        <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}">
-          <span class="brew-recipe-topline">
-            <span>${escapeHtml(method.name)}</span>
-            <span>${escapeHtml(getTagLabel('profile', recipe.tags.profile[0]))} · v${escapeHtml(recipe.version)}</span>
-          </span>
-          <span class="brew-recipe-title">${escapeHtml(recipe.title)}</span>
-          <span class="brew-recipe-summary">${escapeHtml(recipe.summary)}</span>
-          <span class="recipe-tags" aria-label="Recipe tags"><span class="recipe-tag">1:${escapeHtml(formatRatio(recipe.ratio))}</span><span class="recipe-tag">${escapeHtml(formatDuration(recipe.totalDuration))}</span></span>
-          <span class="brew-recipe-footer">
-            <span>${escapeHtml(recipe.difficulty)}</span>
-            <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
-          </span>
-        </button>
-        ${favoriteToggleHtml(recipe.id, recipe.title)}
-      </div>`;
+      <button class="brew-recipe-card" type="button" data-recipe-id="${recipe.id}" style="--card-accent:${method.accent};--card-soft:${method.soft}">
+        <span class="brew-recipe-topline">
+          <span>${escapeHtml(method.name)}</span>
+          <span>${escapeHtml(getTagLabel('profile', recipe.tags.profile[0]))} · v${escapeHtml(recipe.version)}</span>
+        </span>
+        <span class="brew-recipe-title">${escapeHtml(recipe.title)}</span>
+        <span class="brew-recipe-summary">${escapeHtml(recipe.summary)}</span>
+        <span class="recipe-tags" aria-label="Recipe tags"><span class="recipe-tag">1:${escapeHtml(formatRatio(recipe.ratio))}</span><span class="recipe-tag">${escapeHtml(formatDuration(recipe.totalDuration))}</span></span>
+        <span class="brew-recipe-footer">
+          <span>${escapeHtml(recipe.difficulty)}</span>
+          <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+        </span>
+      </button>`;
   }
 
   function renderShelf() {
@@ -1225,7 +1206,7 @@
       elements.shelfEmptyTitle.textContent = view === 'brewed' ? 'No brews logged yet' : 'No favorites yet';
       elements.shelfEmptyCopy.textContent = view === 'brewed'
         ? 'Finish a guided brew or log one by hand and it will appear here.'
-        : 'Tap the heart on any recipe to keep it close.';
+        : 'Open a recipe and choose Favorite to keep it close.';
       elements.shelfEmptyAction.textContent = 'Browse the library';
     }
     elements.shelfStatus.textContent = state.shelf.demo
@@ -1880,9 +1861,7 @@
 
   function handleRecipeCardClick(event) {
     const card = event.target.closest('[data-recipe-id]');
-    if (card && !event.target.closest('[data-favorite-toggle]')) {
-      navigate('recipe', card.dataset.recipeId, { transition: 'push' });
-    }
+    if (card) navigate('recipe', card.dataset.recipeId, { transition: 'push' });
   }
 
   elements.methodList.addEventListener('click', (event) => {
@@ -2053,13 +2032,6 @@
   // -------------------------------------------------------------------------
   // Shelf events.
   // -------------------------------------------------------------------------
-
-  document.addEventListener('click', (event) => {
-    const toggle = event.target.closest('[data-favorite-toggle]');
-    if (!toggle) return;
-    event.preventDefault();
-    toggleFavorite(toggle.dataset.recipeId, toggle);
-  });
 
   elements.shelfButton.addEventListener('click', () => openShelf({ transition: 'push' }));
   elements.libraryFavoritesToggle.addEventListener('click', () => setShelfFilter('favorites'));
