@@ -36,6 +36,17 @@
   } = window.PouroverGlossary;
 
   const {
+    CUE_STORAGE_KEY,
+    CUE_EVENTS,
+    DEFAULT_SETTINGS: DEFAULT_CUE_SETTINGS,
+    HAPTIC_PATTERN_NAMES: CUE_HAPTIC_PATTERN_NAMES,
+    SOUND_PATTERN_NAMES: CUE_SOUND_PATTERN_NAMES,
+    createCueRunner,
+    loadSettings: loadCueSettingsRaw,
+    saveSettings: saveCueSettingsRaw,
+  } = window.PouroverBrewCues || {};
+
+  const {
     SYMPTOMS: ADJUSTMENT_SYMPTOMS,
     applyRecommendation,
     recipeFromSnapshot,
@@ -140,6 +151,17 @@
     timerToggleIcon: document.getElementById('timer-toggle-icon'),
     timerToggleLabel: document.getElementById('timer-toggle-label'),
     resetTimer: document.getElementById('reset-timer'),
+    cueSettingsPanel: document.getElementById('cue-settings'),
+    cueSettingsToggle: document.getElementById('cue-settings-toggle'),
+    cueSettingsClose: document.getElementById('cue-settings-close'),
+    cueSettingsStatus: document.getElementById('cue-settings-status'),
+    cueVoiceEnabled: document.getElementById('cue-voice-enabled'),
+    cueVoicePrepare: document.getElementById('cue-voice-prepare'),
+    cueSoundEnabled: document.getElementById('cue-sound-enabled'),
+    cueHapticsEnabled: document.getElementById('cue-haptics-enabled'),
+    cueLargeDisplay: document.getElementById('cue-large-display'),
+    cueVoiceNote: document.getElementById('cue-voice-note'),
+    cueHapticsNote: document.getElementById('cue-haptics-note'),
     brewComplete: document.getElementById('brew-complete'),
     saveBrewNotes: document.getElementById('save-brew-notes'),
     brewAgain: document.getElementById('brew-again'),
@@ -337,6 +359,9 @@
     lastAnnouncedStep: -1,
     lastPreparationAnnouncementStep: -1,
     lastPreparationHapticStep: -1,
+    cueSettings: CUE_ENABLED ? loadCueSettings() : null,
+    cueRunner: null,
+    cueStatusHandle: null,
     journal: {
       entries: [],
       entry: null,
@@ -374,6 +399,18 @@
     },
   };
 
+  const CUE_ENABLED = typeof CUE_EVENTS !== 'undefined' && Boolean(createCueRunner);
+
+  function loadCueSettings() {
+    if (!CUE_ENABLED) return null;
+    return loadCueSettingsRaw();
+  }
+
+  function saveCueSettings(settings) {
+    if (!CUE_ENABLED) return false;
+    return saveCueSettingsRaw(settings);
+  }
+
   function loadDoses() {
     try {
       const stored = JSON.parse(localStorage.getItem(DOSE_STORAGE_KEY) || '{}');
@@ -389,6 +426,25 @@
     } catch {
       // Private browsing may decline storage. The current brew still works.
     }
+  }
+
+  function initCueRunner() {
+    if (!CUE_ENABLED || state.cueRunner) return state.cueRunner;
+    state.cueRunner = createCueRunner(state.cueSettings);
+    return state.cueRunner;
+  }
+
+  function cueContextForStep(recipeStep) {
+    const target = targetPresentation(recipeStep);
+    const nextTiming = getBrewTiming(state.scaled, elapsedNow());
+    return {
+      action: actionLabel(recipeStep),
+      target: target ? target.value : null,
+      nextBoundary: nextTiming.isFinalStep
+        ? 'This is the final step'
+        : `Next, ${actionLabel(nextTiming.nextStep)} at ${formatDuration(nextTiming.nextStep.startsAt)}`,
+      stepIndex: nextTiming.stepIndex,
+    };
   }
 
   function escapeHtml(value) {
@@ -918,6 +974,8 @@
   function syncBrewFocus() {
     const active = isBrewInProgress();
     document.body.classList.toggle('brew-focus', active);
+    const large = CUE_ENABLED && Boolean(state.cueSettings?.largeDisplay?.enabled);
+    document.body.classList.toggle('brew-large', active && large);
     elements.timerPanel.dataset.focus = active ? 'active' : 'ready';
     elements.back.dataset.mode = active ? 'exit-brew' : 'back';
     elements.back.setAttribute('aria-label', active ? 'Exit guided brew' : 'Go back');
@@ -1162,14 +1220,18 @@
     if (brewId && isKnownRecipeReference(brewId)) {
       chooseRecipe(brewId);
       state.timer = freshTimer();
-      if (shot === 'active') {
+      if (shot === 'active' || shot === 'large' || shot === 'cues') {
         state.scaled = scaleRecipe(state.recipe, state.recipe.defaultCoffee);
         state.timer.elapsed = Math.min(state.scaled.totalDuration - 1, state.scaled.steps[0].duration + 25);
         state.timer.anchorElapsed = state.timer.elapsed;
         state.timer.started = true;
       }
+      if (shot === 'large' && CUE_ENABLED) {
+        state.cueSettings.largeDisplay.enabled = true;
+      }
       renderBrewShell();
       showScreen('brew', { focus, transition: 'none' });
+      if (shot === 'cues') openCueSettings();
       return;
     }
     if (recipeId && isKnownRecipeReference(recipeId)) {
@@ -2598,9 +2660,14 @@
       elements.timerAnnouncement.textContent = `${actionDescription(nextRecipeStep)} in ${Math.ceil(timing.secondsUntilNext)} seconds.${targetAnnouncement}`;
       state.lastPreparationAnnouncementStep = timing.nextStepIndex;
     }
-    if (state.timer.running && timing.isImminent && state.lastPreparationHapticStep !== timing.nextStepIndex) {
-      navigator.vibrate?.([12, 36, 12]);
-      state.lastPreparationHapticStep = timing.nextStepIndex;
+    if (state.timer.running && state.cueRunner && timing.isPreparing) {
+      const nextTarget = targetPresentation(nextRecipeStep);
+      state.cueRunner.fire('prepare', {
+        action: actionLabel(nextRecipeStep),
+        target: nextTarget ? nextTarget.value : null,
+        secondsUntilNext: timing.secondsUntilNext,
+        stepIndex: timing.nextStepIndex,
+      });
     }
   }
 
@@ -2611,6 +2678,7 @@
       state.timer.elapsed = state.scaled.totalDuration;
       state.timer.running = false;
       state.timer.completed = true;
+      state.cueRunner?.fire('complete', { stepIndex: 'complete' });
     }
     elements.timerPanel.hidden = state.timer.completed;
     elements.brewComplete.hidden = !state.timer.completed;
@@ -2646,7 +2714,14 @@
     elements.stepProgress.querySelectorAll('[data-step-dot]').forEach((dot, index) => {
       dot.dataset.state = index < stepIndex ? 'done' : index === stepIndex ? 'active' : 'upcoming';
     });
-    if (state.lastAnnouncedStep !== -1 && state.lastAnnouncedStep !== stepIndex && state.timer.running) navigator.vibrate?.(18);
+    if (state.lastAnnouncedStep !== -1 && state.lastAnnouncedStep !== stepIndex && state.timer.running && state.cueRunner) {
+      state.cueRunner.fire('transition', {
+        action: actionLabel(recipeStep),
+        target: target ? target.value : null,
+        nextBoundary: null,
+        stepIndex,
+      });
+    }
     state.lastAnnouncedStep = stepIndex;
     if (state.timer.running) {
       elements.timerToggleLabel.textContent = 'Pause';
@@ -2671,10 +2746,22 @@
       state.timer.elapsed = Math.min(state.scaled.totalDuration, elapsedNow());
       state.timer.anchorElapsed = state.timer.elapsed;
       state.timer.running = false;
+      if (state.cueRunner) {
+        const currentTiming = getBrewTiming(state.scaled, state.timer.elapsed);
+        const currentStep = currentTiming.currentStep;
+        const currentTarget = targetPresentation(currentStep);
+        state.cueRunner.fire('pause', {
+          action: actionLabel(currentStep),
+          target: currentTarget ? currentTarget.value : null,
+          stepIndex: currentTiming.stepIndex,
+        });
+      }
     } else {
       state.timer.anchorElapsed = state.timer.elapsed;
       state.timer.anchorTime = Date.now();
       state.timer.running = true;
+      initCueRunner();
+      state.cueRunner?.unlockAudio();
       // A first start should announce the step in progress; a resume should
       // stay quiet, so only clear the marker on the not-started transition.
       if (!state.timer.started) state.lastRenderedStep = null;
@@ -2702,6 +2789,7 @@
     state.lastAnnouncedStep = safeIndex;
     state.lastPreparationAnnouncementStep = -1;
     state.lastPreparationHapticStep = -1;
+    state.cueRunner?.cancel();
     elements.timerAnnouncement.textContent = '';
     renderTimer();
   }
@@ -2710,7 +2798,76 @@
     cancelTimerTick();
     state.timer = freshTimer();
     state.lastAnnouncedStep = -1;
+    state.cueRunner?.cancel();
     renderBrewShell();
+  }
+
+  function cueEventLabel(event) {
+    return { prepare: 'Prepare', transition: 'Step change', pause: 'Pause', complete: 'Complete' }[event] || event;
+  }
+
+  function announceCueStatus(message) {
+    elements.cueSettingsStatus.textContent = message;
+    elements.cueSettingsStatus.hidden = false;
+    window.clearTimeout(state.cueStatusHandle);
+    state.cueStatusHandle = window.setTimeout(() => {
+      elements.cueSettingsStatus.hidden = true;
+    }, 2600);
+  }
+
+  function syncCueSettingsControls() {
+    if (!CUE_ENABLED) return;
+    const s = state.cueSettings;
+    elements.cueVoiceEnabled.checked = s.voice.enabled;
+    elements.cueVoicePrepare.checked = s.voice.announcePrepare;
+    elements.cueSoundEnabled.checked = s.sound.enabled;
+    elements.cueHapticsEnabled.checked = s.haptics.enabled;
+    elements.cueLargeDisplay.checked = s.largeDisplay.enabled;
+    elements.cueVoicePrepare.disabled = !s.voice.enabled;
+    document.querySelectorAll('[data-cue-sound]').forEach((select) => {
+      select.value = s.sound.patterns[select.dataset.cueSound];
+      select.disabled = !s.sound.enabled;
+    });
+    document.querySelectorAll('[data-cue-haptics]').forEach((select) => {
+      select.value = s.haptics.patterns[select.dataset.cueHaptics];
+      select.disabled = !s.haptics.enabled;
+    });
+    elements.cueVoiceNote.hidden = typeof window !== 'undefined' && Boolean(window.speechSynthesis);
+    elements.cueHapticsNote.hidden = typeof navigator !== 'undefined' && Boolean(navigator.vibrate);
+  }
+
+  function persistCueSettings() {
+    saveCueSettings(state.cueSettings);
+    if (state.cueRunner) state.cueRunner.updateSettings(state.cueSettings);
+    syncBrewFocus();
+  }
+
+  function openCueSettings() {
+    if (!CUE_ENABLED) return;
+    initCueRunner();
+    syncCueSettingsControls();
+    elements.cueSettingsPanel.hidden = false;
+    elements.cueSettingsToggle.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeCueSettings() {
+    elements.cueSettingsPanel.hidden = true;
+    elements.cueSettingsToggle.setAttribute('aria-expanded', 'false');
+  }
+
+  function previewCue(event) {
+    if (!CUE_ENABLED) return;
+    initCueRunner();
+    state.cueRunner.unlockAudio();
+    const sample = {
+      action: 'Pour',
+      target: '150g',
+      secondsUntilNext: 15,
+      nextBoundary: 'Next, Swirl at 0:45',
+      stepIndex: `preview-${event}`,
+    };
+    state.cueRunner.fire(event, sample);
+    announceCueStatus(`Previewing ${cueEventLabel(event).toLowerCase()} cue`);
   }
 
   function openAbout() {
@@ -2767,6 +2924,7 @@
   });
   elements.startBrew.addEventListener('click', () => {
     state.timer = freshTimer();
+    initCueRunner();
     navigate('brew', recipeRouteReference(state.recipe), { transition: 'push' });
   });
   elements.myRecipesButton.addEventListener('click', () => openMyRecipes({ transition: 'push' }));
@@ -2849,6 +3007,57 @@
   elements.previousStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex - 1));
   elements.nextStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex + 1));
   elements.resetTimer.addEventListener('click', resetTimer);
+  elements.cueSettingsToggle.addEventListener('click', () => {
+    if (elements.cueSettingsPanel.hidden) openCueSettings();
+    else closeCueSettings();
+  });
+  elements.cueSettingsClose.addEventListener('click', () => {
+    closeCueSettings();
+    elements.cueSettingsToggle.focus({ preventScroll: true });
+  });
+  elements.cueVoiceEnabled.addEventListener('change', () => {
+    state.cueSettings.voice.enabled = elements.cueVoiceEnabled.checked;
+    persistCueSettings();
+    syncCueSettingsControls();
+  });
+  elements.cueVoicePrepare.addEventListener('change', () => {
+    state.cueSettings.voice.announcePrepare = elements.cueVoicePrepare.checked;
+    persistCueSettings();
+  });
+  elements.cueSoundEnabled.addEventListener('change', () => {
+    state.cueSettings.sound.enabled = elements.cueSoundEnabled.checked;
+    if (elements.cueSoundEnabled.checked) {
+      initCueRunner();
+      state.cueRunner.unlockAudio();
+    }
+    persistCueSettings();
+    syncCueSettingsControls();
+  });
+  elements.cueHapticsEnabled.addEventListener('change', () => {
+    state.cueSettings.haptics.enabled = elements.cueHapticsEnabled.checked;
+    persistCueSettings();
+    syncCueSettingsControls();
+  });
+  elements.cueLargeDisplay.addEventListener('change', () => {
+    state.cueSettings.largeDisplay.enabled = elements.cueLargeDisplay.checked;
+    persistCueSettings();
+    announceCueStatus(elements.cueLargeDisplay.checked ? 'Large timer on' : 'Large timer off');
+  });
+  document.querySelectorAll('[data-cue-sound]').forEach((select) => {
+    select.addEventListener('change', () => {
+      state.cueSettings.sound.patterns[select.dataset.cueSound] = select.value;
+      persistCueSettings();
+    });
+  });
+  document.querySelectorAll('[data-cue-haptics]').forEach((select) => {
+    select.addEventListener('change', () => {
+      state.cueSettings.haptics.patterns[select.dataset.cueHaptics] = select.value;
+      persistCueSettings();
+    });
+  });
+  document.querySelectorAll('[id^="cue-preview-"]').forEach((button) => {
+    button.addEventListener('click', () => previewCue(button.id.replace('cue-preview-', '')));
+  });
   elements.saveBrewNotes.addEventListener('click', () => openJournalForm({
     recipeRef: state.recipe.revisionId,
     dose: state.scaled.coffee,
@@ -2972,6 +3181,16 @@
     if (event.key === 'Escape' && state.term.open) {
       event.preventDefault();
       closeTerm();
+    }
+    if (state.screen !== 'brew') return;
+    const tag = event.target?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      toggleTimer();
+    } else if (event.key === 'n' || event.key === 'N') {
+      event.preventDefault();
+      seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex + 1);
     }
   });
   elements.home.addEventListener('click', () => {

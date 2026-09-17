@@ -29,6 +29,8 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?recipe=v60-bright',
     '/?recipe=clever-water-first&shot=timeline',
     '/?brew=v60-bright&shot=active',
+    '/?brew=v60-bright&shot=cues',
+    '/?brew=v60-bright&shot=large',
     '/?journal=demo',
     '/?journal=demo&entry=demo-v60',
     '/?journal=demo&entry=demo-v60&adjust=sour',
@@ -55,33 +57,38 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[4].id, 'recipe.timeline');
   assert.equal(manifest.tests[5].visual, true);
   assert.equal(manifest.tests[5].id, 'brew.guided-timer');
+  assert.equal(manifest.tests[6].id, 'brew.cue-settings');
+  assert.equal(manifest.tests[7].id, 'brew.large-timer');
+  const testById = (id) => manifest.tests.find((entry) => entry.id === id);
   assert.equal(manifest.tests[1].expectText, '3 recipes for V60');
   assert.equal(manifest.tests[2].expectText, 'Sweet pulse');
   assert.equal(manifest.tests[3].expectText, 'Pourover Coffee original');
+  assert.equal(testById('journal.history').expectText, 'Staging demo: Finca El Jardín');
+  assert.equal(testById('journal.snapshot').expectText, 'Brew snapshot');
   assert.equal(manifest.tests[4].expectText, 'Start at 0:00');
   assert.equal(manifest.tests[5].expectText, 'Now');
-  assert.equal(manifest.tests[6].expectText, 'Staging demo: Finca El Jardín');
-  assert.equal(manifest.tests[7].expectText, 'Brew snapshot');
-  assert.equal(manifest.tests[8].id, 'journal.adjustment');
-  assert.equal(manifest.tests[8].expectText, 'Try one small grind step finer');
-  assert.equal(manifest.tests[9].expectText, 'What did you use?');
-  assert.ok(manifest.tests.slice(6, 10).every((entry) => entry.visual));
-  assert.equal(manifest.tests[18].visual, true);
-  assert.equal(manifest.tests[18].id, 'glossary.term-panel');
-  assert.match(manifest.tests[18].expectText, /gas escape/);
-  assert.equal(manifest.tests[19].expectText, '3 recipes for AeroPress');
-  assert.equal(manifest.tests[20].id, 'manual.aeropress-recipe');
-  assert.equal(manifest.tests[21].id, 'manual.aeropress-timer');
-  assert.ok(manifest.tests.slice(20, 22).every((entry) => entry.visual));
-  assert.deepEqual(manifest.tests.slice(22, 26).map((entry) => entry.id), [
+  assert.equal(manifest.tests[8].expectText, 'Staging demo: Finca El Jardín');
+  assert.equal(manifest.tests[9].expectText, 'Brew snapshot');
+  assert.equal(manifest.tests[10].id, 'journal.adjustment');
+  assert.equal(manifest.tests[10].expectText, 'Try one small grind step finer');
+  assert.equal(manifest.tests[11].expectText, 'What did you use?');
+  assert.ok(manifest.tests.slice(8, 12).every((entry) => entry.visual));
+  assert.equal(manifest.tests[20].visual, true);
+  assert.equal(manifest.tests[20].id, 'glossary.term-panel');
+  assert.match(manifest.tests[20].expectText, /gas escape/);
+  assert.equal(manifest.tests[21].expectText, '3 recipes for AeroPress');
+  assert.equal(manifest.tests[22].id, 'manual.aeropress-recipe');
+  assert.equal(manifest.tests[23].id, 'manual.aeropress-timer');
+  assert.ok(manifest.tests.slice(22, 24).every((entry) => entry.visual));
+  assert.deepEqual(manifest.tests.slice(24, 28).map((entry) => entry.id), [
     'personal-recipes.library',
     'personal-recipes.lineage',
     'personal-recipes.editor',
     'personal-recipes.timer',
   ]);
-  assert.ok(manifest.tests.slice(22, 26).every((entry) => entry.visual));
-  assert.equal(manifest.tests[26].id, 'offline.sync-status');
-  assert.equal(manifest.tests[26].expectText, 'Sync status');
+  assert.ok(manifest.tests.slice(24, 28).every((entry) => entry.visual));
+  assert.equal(manifest.tests[28].id, 'offline.sync-status');
+  assert.equal(manifest.tests[28].expectText, 'Sync status');
 });
 
 test('private recipe screens expose creation, lineage, revision, and lifecycle controls', () => {
@@ -147,7 +154,8 @@ test('the guided timer includes an accessible non-ticking upcoming-step preview'
   assert.match(html, /id="next-step-preparation"/);
   assert.match(html, /id="timer-announcement"[^>]+aria-live="polite"/);
   assert.doesNotMatch(html, /id="next-step-preview"[^>]+aria-live=/);
-  assert.match(source, /navigator\.vibrate\?\.\(\[12, 36, 12\]\)/);
+  assert.match(html, /id="cue-settings"/);
+  assert.match(html, /id="cue-settings-toggle"/);
 });
 
 test('guided brewing shares one timeline and enters a protected mobile focus mode', () => {

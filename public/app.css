@@ -2474,3 +2474,201 @@ textarea:focus-visible,
 @media (max-width: 480px) {
   .offline-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ---------------------------------------------------------------------------
+   Brew cue settings and large-timer accessibility mode.
+   --------------------------------------------------------------------------- */
+
+.cue-settings {
+  margin-top: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--recipe-accent, #a84f32), white 60%);
+  border-radius: 1.4rem;
+  padding: 1.15rem 1.2rem 1.3rem;
+  background: rgba(255, 252, 246, 0.94);
+}
+
+.cue-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.cue-settings-note {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #725f50;
+}
+
+.cue-settings-status {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #3f5d3f;
+}
+
+.cue-settings-grid {
+  margin-top: 0.9rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .cue-settings-grid { grid-template-columns: 1fr 1fr; }
+}
+
+.cue-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2c211a;
+}
+
+.cue-availability {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #8a5a2a;
+}
+
+.cue-pattern-rows {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.cue-pattern-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.cue-pattern-label {
+  min-width: 5.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #9c826e;
+}
+
+.cue-select {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: #6d5849;
+}
+
+.cue-select select {
+  min-height: 2.3rem;
+  border-radius: 0.7rem;
+  border: 1px solid #d8cbbc;
+  background: #fbf7f0;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.82rem;
+  color: #2c211a;
+}
+
+.cue-preview-row {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cue-preview-row .outline-button {
+  min-height: 2.4rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.78rem;
+}
+
+.cue-hint {
+  margin-top: 0.9rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #8c7767;
+}
+
+/* Large-timer mode: high contrast, scalable type, simplified controls. */
+body.brew-large #timer-panel {
+  background: #1d130c;
+}
+
+body.brew-large #timer-ring {
+  width: min(80vw, 20rem);
+  background: conic-gradient(var(--recipe-accent) var(--progress), #3c2c20 0deg);
+}
+
+body.brew-large #timer-ring::before {
+  background: #120b06;
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+body.brew-large #timer-clock {
+  color: #fff6ea;
+  font-size: clamp(4rem, 20vw, 6.5rem);
+}
+
+body.brew-large #timer-total,
+body.brew-large #timer-step-kicker {
+  color: #d9c4ac;
+}
+
+body.brew-large .timer-panel > .mt-6.text-center {
+  background: #2a1c12;
+  border-color: #57402c;
+}
+
+body.brew-large #active-step-number { color: #e8b98a; }
+body.brew-large #active-step-label { color: #fff6ea; }
+body.brew-large #active-step-instruction { color: #e3cbb2; }
+body.brew-large #active-water-target { color: #fff6ea; }
+body.brew-large .next-step-preview { background: #2a1c12; border-color: #57402c; }
+body.brew-large #next-step-preparation { color: #e3cbb2; }
+body.brew-large #next-step-label { color: #fff6ea; }
+body.brew-large #step-progress .progress-dot[data-state="upcoming"] { background: #57402c; }
+
+body.brew-large #timer-toggle {
+  min-height: 4.2rem;
+  font-size: 1.15rem;
+}
+
+body.brew-large #timer-toggle,
+body.brew-large #previous-step,
+body.brew-large #next-step,
+body.brew-large #reset-timer,
+body.brew-large #cue-settings-toggle {
+  min-height: 4rem;
+}
+
+body.brew-large #previous-step,
+body.brew-large #next-step {
+  min-width: 4rem;
+  color: #fff6ea;
+  border-color: #57402c;
+  background: #2a1c12;
+}
+
+body.brew-large .cue-settings {
+  background: #2a1c12;
+  border-color: #57402c;
+}
+
+body.brew-large .cue-settings-note,
+body.brew-large .cue-settings-status,
+body.brew-large .cue-availability,
+body.brew-large .cue-select,
+body.brew-large .cue-hint { color: #e3cbb2; }
+
+body.brew-large .cue-toggle { color: #fff6ea; }
+
+body.brew-large .cue-select select {
+  background: #1d130c;
+  color: #fff6ea;
+  border-color: #57402c;
+}
