@@ -88,6 +88,14 @@
       seeAlso: ['percolation', 'immersion', 'drawdown'],
     },
     {
+      id: 'pressure-assisted',
+      term: 'Pressure-assisted',
+      category: 'Technique',
+      summary: 'A brew finished by gently pushing water through the coffee and filter.',
+      detail: 'AeroPress brewing starts with immersion, then uses hand pressure to move the brewed coffee through a small filter. A slow, steady press keeps the cup clean; forcing the plunger hard can disturb the grounds and add harshness.',
+      seeAlso: ['immersion', 'press', 'steep'],
+    },
+    {
       id: 'pulse-pour',
       term: 'Pulse pour',
       category: 'Technique',
@@ -200,6 +208,22 @@
       summary: 'A measured addition of water, usually in slow circles from the center outward.',
       detail: 'Pour low and steadily, starting at the center and widening if the recipe asks for it. Pouring height and speed are really agitation controls: a low thin stream disturbs the bed least, a high fast one stirs it up.',
       seeAlso: ['agitation', 'water-target', 'bypass'],
+    },
+    {
+      id: 'press',
+      term: 'Press',
+      category: 'Brewing steps',
+      summary: 'Pushing an AeroPress plunger down with slow, even pressure.',
+      detail: 'Keep the brewer square on a sturdy mug and press with both hands. Aim for a smooth finish rather than speed, and stop at the first hiss so compressed grounds and air are not forced through the filter.',
+      seeAlso: ['pressure-assisted', 'steep', 'immersion'],
+    },
+    {
+      id: 'flip',
+      term: 'Flip',
+      category: 'Brewing steps',
+      summary: 'Turning an inverted AeroPress upright onto the serving mug.',
+      detail: 'Hold the chamber and plunger together, bring the mug close, then turn the brewer in one controlled motion. The filter cap must be secure and the landing surface stable before any pressure is applied.',
+      seeAlso: ['pressure-assisted', 'press'],
     },
 
     // In the cup
@@ -421,6 +445,8 @@
     Settle: 'stir',
     'Fill and stir': 'stir',
     'Add and stir': 'stir',
+    Stir: 'stir',
+    Swirl: 'swirl',
     'Settle the bed': 'bed-prep',
     'Prepare the bed': 'bed-prep',
     'Shape the bed': 'bed-prep',
@@ -442,6 +468,9 @@
     'Build body': 'pour',
     Finish: 'pour',
     'Concentrated finish': 'pour',
+    Fill: 'pour',
+    Press: 'press',
+    Flip: 'flip',
   });
 
   // Taxonomy facet value to glossary term, so every filter label and every
@@ -460,6 +489,7 @@
       percolation: 'percolation',
       immersion: 'immersion',
       hybrid: 'hybrid',
+      'pressure-assisted': 'pressure-assisted',
       'single-pour': 'single-pour',
       pulse: 'pulse-pour',
     }),

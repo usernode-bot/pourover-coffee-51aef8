@@ -1,17 +1,18 @@
 # Pourover Coffee
 
-A calm, mobile-first companion for finding and scaling pour-over recipes,
-then following a brew one timed step at a time. It includes fifteen original
-recipes across V60, Hario Switch, Mugen, Clever Dripper, and cotton-filter
-brewing.
+A calm, mobile-first companion for finding and scaling manual-coffee recipes,
+then following a brew one timed action at a time. It includes twenty-four
+original recipes across V60, Hario Switch, Mugen, Clever Dripper,
+cotton-filter brewing, Kalita Wave, Chemex, and AeroPress.
 
 ## What it does
 
 - Scales coffee from 5g to 60g and calculates total water from each recipe's
   ratio.
-- Scales every cumulative pour target with the chosen dose.
+- Scales every cumulative water target with the chosen dose while preserving
+  action-only steps such as stir, steep, flip, release, and press.
 - Separates brewing methods from recipes, with three distinct recipes for
-  every supported brewer.
+  every supported brewer and metadata for brewing family and filter material.
 - Filters the recipe library by method, roast, cup profile, technique,
   experience, and serving size. Filters combine across facets and remain in
   the URL so a result set can be shared or checked directly.
@@ -22,8 +23,8 @@ brewing.
   any single definition.
 - Guides a brew with a timestamp-based timer that stays accurate after the
   page has been in the background.
-- Keeps the next action visible with its scheduled time, countdown, scaled
-  water target, and a preparation cue.
+- Keeps the next action visible with its scheduled time, countdown, optional
+  scaled water target, and a preparation cue.
 - Provides pause, resume, previous, next, reset, and brew-again controls.
 - Saves private brew journal entries from a completed timer or a manual form,
   including coffee, roaster, process, roast date, grinder, setting, water,

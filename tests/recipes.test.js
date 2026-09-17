@@ -9,6 +9,7 @@ const {
   MIN_COFFEE_GRAMS,
   RECIPES,
   RECIPE_REVISIONS,
+  STEP_ACTIONS,
   TAG_KEYS,
   TAG_TAXONOMY,
   clampCoffee,
@@ -26,12 +27,16 @@ const {
   scaleRecipe,
 } = require('../public/recipes');
 
-test('methods and recipes are separate with three recipes per brewer', () => {
-  assert.deepEqual(METHODS.map((method) => method.id), ['v60', 'switch', 'mugen', 'clever', 'cotton']);
-  assert.equal(RECIPES.length, 15);
+test('manual-coffee methods and recipes are separate with three recipes per brewer', () => {
+  assert.deepEqual(METHODS.map((method) => method.id), [
+    'v60', 'switch', 'mugen', 'clever', 'cotton', 'kalita', 'chemex', 'aeropress',
+  ]);
+  assert.equal(RECIPES.length, 24);
   assert.equal(new Set(RECIPES.map((recipe) => recipe.id)).size, RECIPES.length);
 
   for (const method of METHODS) {
+    assert.ok(method.family.trim(), `${method.id} family`);
+    assert.ok(method.filterMaterial.trim(), `${method.id} filter material`);
     const recipes = getRecipesForMethod(method.id);
     assert.equal(recipes.length, 3, method.id);
     assert.ok(recipes.some((recipe) => recipe.id === method.defaultRecipeId), method.defaultRecipeId);
@@ -47,6 +52,9 @@ test('every recipe has complete attribution and valid typed tags', () => {
     assert.ok(recipe.title.trim());
     assert.ok(recipe.summary.trim());
     assert.ok(recipe.result.trim());
+    for (const recipeStep of recipe.steps) {
+      assert.ok(STEP_ACTIONS[recipeStep.action], `${recipe.id}:${recipeStep.label}:${recipeStep.action}`);
+    }
     for (const facet of TAG_KEYS) {
       const allowed = new Set(TAG_TAXONOMY[facet].values.map((entry) => entry.value));
       assert.ok(recipe.tags[facet].length > 0, `${recipe.id}:${facet}`);
@@ -90,15 +98,34 @@ test('water uses deterministic nearest-gram ratio rounding per recipe', () => {
   assert.equal(scaleRecipe('cotton-delicate-light', 13).water, 182);
 });
 
-test('every recipe ends at total water with monotonic cumulative targets', () => {
+test('every recipe reaches total water with monotonic optional cumulative targets', () => {
   for (const recipe of RECIPES) {
     for (const dose of [MIN_COFFEE_GRAMS, recipe.defaultCoffee, MAX_COFFEE_GRAMS]) {
       const scaled = scaleRecipe(recipe, dose);
-      const targets = scaled.steps.map((recipeStep) => recipeStep.target);
+      const targets = scaled.steps
+        .filter((recipeStep) => Number.isFinite(recipeStep.target))
+        .map((recipeStep) => recipeStep.target);
       assert.equal(targets.at(-1), scaled.water, `${recipe.id} final target`);
       assert.ok(targets.every((target, index) => index === 0 || target >= targets[index - 1]), recipe.id);
     }
   }
+});
+
+test('pressure-assisted recipes preserve steps without water targets', () => {
+  const scaled = scaleRecipe('aeropress-inverted', 27);
+  assert.equal(scaled.water, Math.round(27 * 12.22));
+  assert.equal(scaled.steps.find((recipeStep) => recipeStep.label === 'Fill').target, scaled.water);
+  for (const label of ['Assemble inverted', 'Stir', 'Steep', 'Flip', 'Press']) {
+    const recipeStep = scaled.steps.find((entry) => entry.label === label);
+    assert.ok(recipeStep, label);
+    assert.equal(Object.hasOwn(recipeStep, 'target'), false, label);
+  }
+
+  const timeline = getRecipeTimeline(scaled);
+  const press = timeline.steps.find((recipeStep) => recipeStep.label === 'Press');
+  assert.equal(press.action, 'press');
+  assert.equal(press.target, null);
+  assert.equal(press.targetKind, 'none');
 });
 
 test('scaled step targets keep the selected recipe proportions', () => {
@@ -184,8 +211,8 @@ test('the last brew step has no stale upcoming action', () => {
 });
 
 test('the original recipe library is an explicit first revision of every stable recipe', () => {
-  assert.equal(RECIPE_REVISIONS.length, 15);
-  assert.equal(RECIPES.length, 15);
+  assert.equal(RECIPE_REVISIONS.length, 24);
+  assert.equal(RECIPES.length, 24);
   for (const recipe of RECIPES) {
     assert.equal(recipe.version, 1, recipe.id);
     assert.equal(recipe.revisionId, `${recipe.id}@1`);
