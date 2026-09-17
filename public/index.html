@@ -93,6 +93,7 @@
           </span>
         </button>
         <div class="flex items-center gap-1 sm:gap-3">
+          <button id="my-recipes-button" class="text-button un-touch-target" type="button">My recipes</button>
           <button id="shelf-button" class="text-button un-touch-target" type="button">My shelf</button>
           <button id="journal-button" class="text-button un-touch-target" type="button">Journal</button>
           <button id="glossary-button" class="text-button un-touch-target" type="button">Glossary</button>
@@ -109,8 +110,8 @@
             <h1 id="library-title" tabindex="-1" class="mt-3 max-w-xl text-[2.65rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#2b211b] sm:text-6xl">
               Better coffee,<br><span class="font-serif font-normal italic text-[#a34d31]">one pour at a time.</span>
             </h1>
-            <p class="mt-5 max-w-lg text-[15px] leading-6 text-[#6f5d50] sm:text-base">
-              Pick a brewer or start with the cup you want. Fifteen original recipes give you room to explore before the guided timer takes over.
+            <p id="library-intro" class="mt-5 max-w-lg text-[15px] leading-6 text-[#6f5d50] sm:text-base">
+              Pick a brewer or start with the cup you want. Twenty-four original recipes give you room to explore before the guided timer takes over.
             </p>
           </div>
           <div class="hero-art" aria-hidden="true">
@@ -126,7 +127,7 @@
             <p class="eyebrow">Brewer shelf</p>
             <h2 class="mt-1 text-2xl font-semibold tracking-tight text-[#2c211a]">What are you brewing?</h2>
           </div>
-          <p class="hidden max-w-xs text-right text-xs leading-5 text-[#8c7868] sm:block">Five methods, three recipes each.<br>Adjust every recipe from 5g to 60g.</p>
+          <p id="library-catalog-summary" class="hidden max-w-xs text-right text-xs leading-5 text-[#8c7868] sm:block">Eight methods, twenty-four recipes total.<br>Adjust every recipe from 5g to 60g.</p>
         </div>
 
         <div id="method-list" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Brewing methods"></div>
@@ -234,6 +235,16 @@
                 <span class="shelf-action-icon" aria-hidden="true">＋</span>
                 <span>Add to collection</span>
               </button>
+              <button id="recipe-variant-button" class="shelf-action" type="button">
+                <span class="shelf-action-icon" aria-hidden="true">✎</span>
+                <span id="recipe-variant-label">Make my own version</span>
+              </button>
+            </div>
+            <div id="personal-recipe-actions" class="mt-3 flex flex-wrap gap-2" hidden>
+              <button id="personal-recipe-edit" class="outline-button justify-center" type="button">Edit recipe</button>
+              <button id="personal-recipe-duplicate" class="outline-button justify-center" type="button">Duplicate</button>
+              <button id="personal-recipe-archive" class="outline-button justify-center" type="button">Archive</button>
+              <button id="personal-recipe-delete" class="danger-button justify-center" type="button">Delete</button>
             </div>
           </div>
           <div id="recipe-art" class="recipe-hero-art" aria-hidden="true"></div>
@@ -283,6 +294,7 @@
               <h2 id="profile-heading" class="mt-1 text-xl font-semibold tracking-tight">What to expect</h2>
               <p id="recipe-result" class="mt-2 text-sm leading-6 text-[#725f50]"></p>
               <dl id="recipe-tag-groups" class="recipe-tag-groups mt-4"></dl>
+              <p id="recipe-private-notes" class="mt-4 rounded-2xl bg-[#f1e9df] px-4 py-3 text-xs leading-5 text-[#756354]" hidden></p>
             </section>
           </div>
 
@@ -300,6 +312,109 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
             </button>
           </section>
+        </div>
+
+        <div id="personal-recipe-delete-confirmation" class="delete-confirmation mt-4" role="group" aria-labelledby="personal-recipe-delete-title" hidden>
+          <div>
+            <h2 id="personal-recipe-delete-title" class="text-base font-semibold">Delete this personal recipe?</h2>
+            <p class="mt-1 text-sm text-[#755f50]">Past journal entries keep their exact recipe snapshots. This recipe and its revisions will no longer be available.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button id="personal-recipe-delete-cancel" class="outline-button justify-center" type="button">Keep recipe</button>
+            <button id="personal-recipe-delete-confirm" class="danger-button justify-center" type="button">Delete permanently</button>
+          </div>
+        </div>
+        <p id="personal-recipe-detail-error" class="journal-form-error mt-4" role="alert" hidden></p>
+      </section>
+
+      <section id="my-recipes-screen" class="screen" data-screen="my-recipes" data-active="false" aria-labelledby="my-recipes-title" hidden>
+        <div class="personal-recipes-hero rounded-[2rem] px-5 py-7 sm:px-8 sm:py-9">
+          <span class="personal-recipes-hero-mark" aria-hidden="true">✎</span>
+          <div class="relative z-10 max-w-2xl">
+            <p class="eyebrow">Private recipe book</p>
+            <h1 id="my-recipes-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">My recipes</h1>
+            <p class="mt-3 max-w-xl text-sm leading-6 text-[#66564a] sm:text-base">Build recipes around your coffee and equipment. Every saved edit becomes a new private revision.</p>
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div class="personal-recipe-tabs" role="group" aria-label="Personal recipe status">
+            <button id="personal-recipes-active" type="button" aria-pressed="true">Active</button>
+            <button id="personal-recipes-archived" type="button" aria-pressed="false">Archived</button>
+          </div>
+          <button id="personal-recipe-new" class="primary-button justify-center" type="button">Create a recipe</button>
+        </div>
+
+        <p id="personal-recipes-status" class="journal-status mt-4" role="status" aria-live="polite"></p>
+        <div id="personal-recipes-list" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3" aria-label="Personal recipes"></div>
+        <div id="personal-recipes-empty" class="empty-state mt-5" hidden>
+          <span aria-hidden="true">✎</span>
+          <strong id="personal-recipes-empty-title">No personal recipes yet</strong>
+          <p id="personal-recipes-empty-copy">Start from scratch or open an original recipe and make your own version.</p>
+          <button id="personal-recipes-empty-action" class="outline-button" type="button">Create your first recipe</button>
+        </div>
+        <div id="personal-recipes-error" class="journal-error mt-5" role="alert" hidden>
+          <div>
+            <strong>Your recipes could not be loaded</strong>
+            <p id="personal-recipes-error-copy">Please try again in a moment.</p>
+          </div>
+          <button id="personal-recipes-retry" class="outline-button" type="button">Try again</button>
+        </div>
+      </section>
+
+      <section id="recipe-form-screen" class="screen" data-screen="recipe-form" data-active="false" aria-labelledby="recipe-form-title" hidden>
+        <div class="journal-form-shell mx-auto max-w-4xl">
+          <div class="personal-recipes-hero rounded-[2rem] p-5 sm:p-8">
+            <p id="recipe-form-kicker" class="eyebrow">New private recipe</p>
+            <h1 id="recipe-form-title" tabindex="-1" class="mt-2 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Create a recipe</h1>
+            <p id="recipe-form-intro" class="mt-3 max-w-2xl text-sm leading-6 text-[#66564a]">Set the dose, ratio, instructions, and cues you want beside you during a brew.</p>
+            <p id="recipe-form-source" class="source-badge mt-4" hidden></p>
+          </div>
+
+          <form id="personal-recipe-form" class="mt-4 space-y-4" novalidate>
+            <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="recipe-form-basics-heading">
+              <p class="eyebrow">Recipe basics</p>
+              <h2 id="recipe-form-basics-heading" class="mt-1 text-xl font-semibold tracking-tight">Name and brew setup</h2>
+              <div class="journal-form-grid mt-5">
+                <label class="journal-field journal-field-wide"><span>Recipe name</span><input name="title" maxlength="100" required></label>
+                <label class="journal-field"><span>Method</span><select name="methodId" required></select></label>
+                <label class="journal-field"><span>Coffee dose (g)</span><input name="defaultCoffee" type="number" min="5" max="60" step="1" inputmode="numeric" required></label>
+                <label class="journal-field"><span>Ratio, 1 to</span><input name="ratio" type="number" min="5" max="30" step="0.01" inputmode="decimal" required></label>
+                <label class="journal-field"><span>Water temperature</span><input name="temperature" maxlength="80" placeholder="93°C" required></label>
+                <label class="journal-field"><span>Grind guidance</span><input name="grind" maxlength="120" placeholder="Medium-fine" required></label>
+                <label class="journal-field"><span>Difficulty</span><input name="difficulty" maxlength="40" placeholder="Approachable" required></label>
+                <label class="journal-field journal-field-wide"><span>Equipment</span><textarea name="equipment" maxlength="240" rows="2" required></textarea></label>
+                <label class="journal-field journal-field-wide"><span>Summary</span><textarea name="summary" maxlength="300" rows="3" required></textarea></label>
+                <label class="journal-field journal-field-wide"><span>Expected cup</span><textarea name="result" maxlength="500" rows="3" required></textarea></label>
+                <label class="journal-field journal-field-wide"><span>Private notes (optional)</span><textarea name="notes" maxlength="2000" rows="3"></textarea></label>
+              </div>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="recipe-form-tags-heading">
+              <p class="eyebrow">Discovery details</p>
+              <h2 id="recipe-form-tags-heading" class="mt-1 text-xl font-semibold tracking-tight">Tags</h2>
+              <p class="mt-2 text-sm leading-6 text-[#756456]">Choose at least one value in every group.</p>
+              <div id="personal-recipe-tags" class="personal-recipe-tag-grid mt-5"></div>
+            </section>
+
+            <section class="paper-card rounded-3xl p-5 sm:p-6" aria-labelledby="recipe-form-steps-heading">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="eyebrow">Guided brew</p>
+                  <h2 id="recipe-form-steps-heading" class="mt-1 text-xl font-semibold tracking-tight">Timed steps</h2>
+                  <p id="personal-recipe-water-total" class="mt-2 text-sm text-[#756456]"></p>
+                </div>
+                <button id="personal-recipe-add-step" class="outline-button justify-center" type="button">Add step</button>
+              </div>
+              <ol id="personal-recipe-steps" class="personal-recipe-step-list mt-5"></ol>
+            </section>
+
+            <p id="personal-recipe-form-error" class="journal-form-error" role="alert" hidden></p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <button id="personal-recipe-form-save" class="primary-button justify-center" type="submit">Save private recipe</button>
+              <button id="personal-recipe-form-cancel" class="outline-button justify-center" type="button">Cancel</button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -759,7 +874,7 @@
     <div class="about-card p-6 text-[#2c211a]">
       <p class="eyebrow">About the recipes</p>
       <h2 class="mt-2 text-2xl font-semibold tracking-tight">A dependable place to begin</h2>
-      <p class="mt-3 text-sm leading-6 text-[#725f50]">Coffee changes with the bean, water, grinder, and room. The fifteen original recipes give you distinct starting points for different coffees and cup profiles.</p>
+      <p class="mt-3 text-sm leading-6 text-[#725f50]" data-recipe-count-copy>Coffee changes with the bean, water, grinder, and room. Twenty-four original recipes give you distinct starting points for different coffees and cup profiles.</p>
       <p class="mt-3 text-sm leading-6 text-[#725f50]">All water targets scale with your coffee dose. Your preferred dose stays on this device.</p>
       <button class="primary-button mt-6 w-full justify-center" type="button" data-close-about>Got it</button>
     </div>

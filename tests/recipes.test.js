@@ -239,3 +239,38 @@ test('recipe snapshots preserve the exact revision and scaled brew instructions'
   assert.equal(Object.isFrozen(snapshot.steps), true);
   assert.equal(Object.isFrozen(snapshot.steps[0]), true);
 });
+
+test('personal recipe objects use the same scaling, timer, and snapshot model', () => {
+  const source = getRecipeRevision('aeropress-inverted@1');
+  const personalRecipe = {
+    ...source,
+    id: 'personal-11111111-1111-4111-8111-111111111111',
+    version: 3,
+    revisionId: 'personal-11111111-1111-4111-8111-111111111111@3',
+    publishedAt: '2026-09-17',
+    title: 'My inverted AeroPress',
+    equipment: 'AeroPress, metal filter, sturdy mug, scale, and paddle',
+    notes: 'Use the metal filter for this coffee.',
+    isPersonal: true,
+    parentRecipe: {
+      id: source.id,
+      revisionId: source.revisionId,
+      title: source.title,
+      attribution: source.attribution.label,
+    },
+    tags: Object.fromEntries(Object.entries(source.tags).map(([key, values]) => [key, [...values]])),
+    steps: source.steps.map((step) => ({ ...step })),
+    attribution: { label: 'Your private recipe', kind: 'personal' },
+  };
+  const scaled = scaleRecipe(personalRecipe, 30);
+  const timing = getBrewTiming(scaled, 70);
+  const snapshot = createRecipeSnapshot(personalRecipe, 30);
+
+  assert.equal(scaled.steps.find((step) => step.label === 'Fill').target, scaled.water);
+  assert.equal(timing.currentStep.action, 'steep');
+  assert.equal(snapshot.isPersonal, true);
+  assert.equal(snapshot.equipment, personalRecipe.equipment);
+  assert.equal(snapshot.notes, personalRecipe.notes);
+  assert.deepEqual(snapshot.parentRecipe, personalRecipe.parentRecipe);
+  assert.equal(snapshot.revisionId, personalRecipe.revisionId);
+});

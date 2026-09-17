@@ -44,6 +44,10 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?method=aeropress',
     '/?recipe=aeropress-inverted',
     '/?brew=aeropress-inverted&shot=active',
+    '/?myRecipes=1&demo=1',
+    '/?recipe=personal-00000000-0000-4000-8000-000000000013&demo=1',
+    '/?recipeEditor=new&source=v60-bright&demo=1',
+    '/?brew=personal-00000000-0000-4000-8000-000000000013&shot=active&demo=1',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'recipe.timeline');
@@ -65,6 +69,37 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[19].id, 'manual.aeropress-recipe');
   assert.equal(manifest.tests[20].id, 'manual.aeropress-timer');
   assert.ok(manifest.tests.slice(19, 21).every((entry) => entry.visual));
+  assert.deepEqual(manifest.tests.slice(21).map((entry) => entry.id), [
+    'personal-recipes.library',
+    'personal-recipes.lineage',
+    'personal-recipes.editor',
+    'personal-recipes.timer',
+  ]);
+  assert.ok(manifest.tests.slice(21).every((entry) => entry.visual));
+});
+
+test('private recipe screens expose creation, lineage, revision, and lifecycle controls', () => {
+  const html = read('public/index.html');
+  const client = read('public/app.js');
+  const server = read('server.js');
+  const store = read('personal-recipe-store.js');
+
+  assert.match(html, /id="my-recipes-screen"/);
+  assert.match(html, /id="recipe-form-screen"/);
+  assert.match(html, /id="recipe-variant-button"/);
+  assert.match(html, /id="personal-recipe-steps"/);
+  assert.match(html, /id="personal-recipe-delete-confirmation"[^>]+hidden/);
+  assert.match(client, /Save new revision/);
+  assert.match(client, /parentRecipeRef/);
+  assert.match(client, /data-step-move/);
+  assert.match(client, /filterRecipes\(state\.filters, selectableRecipes\(\)\)/);
+  assert.match(client, /brew-recipe-title">\$\{escapeHtml\(recipe\.title\)\}/);
+  assert.match(client, /loadPersonalRevision\(params\.get\('brew'\)\)/);
+  assert.match(server, /app\.post\('\/api\/personal-recipes'/);
+  assert.match(server, /app\.patch\('\/api\/personal-recipes\/:recipeId'/);
+  assert.match(server, /app\.delete\('\/api\/personal-recipes\/:recipeId'/);
+  assert.match(store, /COMMENT ON TABLE personal_recipes IS 'staging:private'/);
+  assert.match(store, /COMMENT ON TABLE personal_recipe_revisions IS 'staging:private'/);
 });
 
 test('the manifest declares visual checks for the shelf screens', () => {
@@ -183,7 +218,7 @@ test('the timer keeps its step label button alive across ticks', () => {
 });
 
 test('user-facing product files contain no em dash encoding', () => {
-  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'server.js', 'journal-store.js', 'dapp.json']) {
+  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'server.js', 'journal-store.js', 'personal-recipe-store.js', 'dapp.json']) {
     const source = read(file);
     assert.doesNotMatch(source, /—|&mdash;|&#8212;|\\u2014/, file);
   }
