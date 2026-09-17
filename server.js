@@ -29,7 +29,7 @@ const APP_AUDIENCE = process.env.USERNODE_APP_ID
   ? `usernode:app:${process.env.USERNODE_APP_ID}`
   : null;
 const PUBLIC_API_PATHS = new Set(['/health']);
-const PLATFORM_ORIGIN = (process.env.USERNODE_PLATFORM_ORIGIN || 'https://my.onhomeroom.com')
+const PLATFORM_ORIGIN = (process.env.USERNODE_PLATFORM_ORIGIN || '')
   .replace(/\/+$/, '');
 
 app.use(express.json({ limit: '32kb' }));
