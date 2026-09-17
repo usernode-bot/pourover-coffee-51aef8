@@ -7,11 +7,13 @@ const { Pool } = require('pg');
 const {
   METHODS,
   RECIPES,
+  RECIPE_REVISIONS,
   createRecipeSnapshot,
   getRecipeRevision,
   isCurrentRecipeRevision,
 } = require('./public/recipes');
 const journal = require('./journal-store');
+const collections = require('./collection-store');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -79,6 +81,12 @@ app.get('/health', (_req, res) => {
 function requireJournal(res) {
   if (pool) return true;
   res.status(503).json({ error: 'Brew journal storage is unavailable right now.' });
+  return false;
+}
+
+function requireShelf(res) {
+  if (pool) return true;
+  res.status(503).json({ error: 'Favorites and collections are unavailable right now.' });
   return false;
 }
 
@@ -252,6 +260,239 @@ app.delete('/api/brews/:id', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Recipe favorites and personal collections.
+//
+// These records belong to one Homeroom user, so every route derives the owner
+// from the verified token and never from the request body. `?demo=1` serves a
+// read-only staging shelf so a preview is reviewable without a signed-in
+// account's private rows.
+// ---------------------------------------------------------------------------
+
+function recipeSummary(recipe) {
+  const method = METHODS.find((candidate) => candidate.id === recipe.methodId) || METHODS[0];
+  return {
+    id: recipe.id,
+    revisionId: recipe.revisionId,
+    version: recipe.version,
+    methodId: method.id,
+    methodName: method.name,
+    title: recipe.title,
+    summary: recipe.summary,
+    ratio: recipe.ratio,
+    defaultCoffee: recipe.defaultCoffee,
+    water: Math.round(recipe.defaultCoffee * recipe.ratio),
+    totalDuration: recipe.steps.reduce((sum, step) => sum + step.duration, 0),
+    difficulty: recipe.difficulty,
+    tags: recipe.tags,
+    accent: method.accent,
+    soft: method.soft,
+  };
+}
+
+// Stable recipe ids resolve to the latest revision, and ids that no longer
+// exist are dropped rather than failing the whole shelf. That is what keeps a
+// favorite or a collection working when a recipe later gains a revision.
+function knownRecipeSummaries(recipeIds) {
+  return recipeIds
+    .map((recipeId) => RECIPES.find((recipe) => recipe.id === recipeId))
+    .filter(Boolean)
+    .map(recipeSummary);
+}
+
+// One client shape for a collection: hydrated latest-revision summaries, in
+// the stored order. Every collection route returns this, so the frontend
+// never has to resolve recipe ids itself.
+function collectionForClient(collection) {
+  return {
+    id: collection.id,
+    name: collection.name,
+    recipes: knownRecipeSummaries(collection.recipeIds || []),
+  };
+}
+
+function demoCollections() {
+  return [
+    { id: 'demo-weekday', name: 'Staging demo: Weekday mornings', recipeIds: ['v60-bright', 'mugen-one-pour', 'clever-quick-clean'] },
+    { id: 'demo-treats', name: 'Staging demo: Weekend treats', recipeIds: ['cotton-silky', 'switch-full-immersion'] },
+  ];
+}
+
+function demoFavorites() {
+  return ['v60-sweet-pulse', 'switch-hybrid', 'cotton-silky'];
+}
+
+function demoRecentlyBrewed() {
+  return ['v60-sweet-pulse', 'switch-full-immersion', 'v60-gentle-large'];
+}
+
+function sendShelfError(res, error) {
+  if (error instanceof collections.CollectionValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  console.error(`Shelf request failed: ${error.message}`);
+  return res.status(500).json({ error: 'The shelf could not complete that request.' });
+}
+
+app.get('/api/shelf', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') {
+      return res.json({
+        demo: true,
+        favorites: knownRecipeSummaries(demoFavorites()),
+        collections: demoCollections().map(collectionForClient),
+        recentlyBrewed: knownRecipeSummaries(demoRecentlyBrewed()),
+      });
+    }
+    if (!requireShelf(res)) return undefined;
+    const shelf = await collections.loadShelf(pool, req.user.id);
+    return res.json({
+      demo: false,
+      favorites: knownRecipeSummaries(shelf.favorites),
+      collections: shelf.collections.map(collectionForClient),
+      recentlyBrewed: knownRecipeSummaries(shelf.recentlyBrewed),
+    });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.get('/api/favorites', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    return res.json({ recipeIds: await collections.listFavorites(pool, req.user.id) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.put('/api/favorites/:recipeId', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const recipeId = collections.normalizeRecipeId(req.params.recipeId);
+    if (!RECIPES.some((recipe) => recipe.id === recipeId)) {
+      return res.status(404).json({ error: 'That recipe is not available.' });
+    }
+    await collections.addFavorite(pool, req.user.id, recipeId);
+    return res.json({ recipeId, favorite: true });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.delete('/api/favorites/:recipeId', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const recipeId = collections.normalizeRecipeId(req.params.recipeId);
+    await collections.removeFavorite(pool, req.user.id, recipeId);
+    return res.json({ recipeId, favorite: false });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.get('/api/collections', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const list = await collections.listCollections(pool, req.user.id);
+    return res.json({ collections: list.map(collectionForClient) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.post('/api/collections', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collection = await collections.createCollection(pool, req.user.id, req.body?.name);
+    return res.status(201).json({ collection: collectionForClient(collection) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.patch('/api/collections/order', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const list = await collections.reorderCollections(pool, req.user.id, req.body?.collectionIds);
+    return res.json({ collections: list.map(collectionForClient) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.patch('/api/collections/:id', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = collections.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
+    const renamed = await collections.renameCollection(pool, req.user.id, collectionId, req.body?.name);
+    if (!renamed) return res.status(404).json({ error: 'Collection not found.' });
+    return res.json({ collection: collectionForClient(await collections.getCollection(pool, req.user.id, collectionId)) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.delete('/api/collections/:id', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = collections.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
+    const deleted = await collections.deleteCollection(pool, req.user.id, collectionId);
+    return deleted ? res.status(204).end() : res.status(404).json({ error: 'Collection not found.' });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.post('/api/collections/:id/recipes', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = collections.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
+    const recipeId = collections.normalizeRecipeId(req.body?.recipeId);
+    if (!RECIPES.some((recipe) => recipe.id === recipeId)) {
+      return res.status(404).json({ error: 'That recipe is not available.' });
+    }
+    const collection = await collections.addRecipeToCollection(pool, req.user.id, collectionId, recipeId);
+    if (!collection) return res.status(404).json({ error: 'Collection not found.' });
+    return res.status(201).json({ collection: collectionForClient(collection) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.delete('/api/collections/:id/recipes/:recipeId', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = collections.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
+    const collection = await collections.removeRecipeFromCollection(
+      pool, req.user.id, collectionId, req.params.recipeId
+    );
+    if (!collection) return res.status(404).json({ error: 'Collection not found.' });
+    return res.json({ collection });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.patch('/api/collections/:id/order', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = collections.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'Collection not found.' });
+    const collection = await collections.reorderCollectionRecipes(
+      pool, req.user.id, collectionId, req.body?.recipeIds
+    );
+    if (!collection) return res.status(404).json({ error: 'Collection not found.' });
+    return res.json({ collection: collectionForClient(collection) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
@@ -304,6 +545,7 @@ async function shutdown(signal) {
 async function boot() {
   try {
     await journal.initializeJournal(pool);
+    await collections.initializeCollections(pool);
   } catch (error) {
     console.error(`Brew journal schema failed: ${error.message}`);
     process.exit(1);

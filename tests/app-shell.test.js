@@ -31,6 +31,12 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?journal=demo',
     '/?journal=demo&entry=demo-v60',
     '/?journal=new',
+    '/?favorites=1&demo=1',
+    '/?shelf=favorites&demo=1',
+    '/?shelf=brewed&demo=1',
+    '/?shelf=collections&demo=1',
+    '/?collection=demo-weekday&demo=1',
+    '/?recipe=v60-bright&shot=picker&demo=1',
     '/?glossary=1',
     '/?glossary=1&q=drawdown',
     '/?glossary=1&term=bloom',
@@ -45,9 +51,24 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[6].expectText, 'Brew snapshot');
   assert.equal(manifest.tests[7].expectText, 'What did you use?');
   assert.ok(manifest.tests.slice(5, 8).every((entry) => entry.visual));
-  assert.equal(manifest.tests[10].visual, true);
-  assert.equal(manifest.tests[10].id, 'glossary.term-panel');
-  assert.match(manifest.tests[10].expectText, /gas escape/);
+  assert.equal(manifest.tests[16].visual, true);
+  assert.equal(manifest.tests[16].id, 'glossary.term-panel');
+  assert.match(manifest.tests[16].expectText, /gas escape/);
+});
+
+test('the manifest declares visual checks for the shelf screens', () => {
+  const manifest = JSON.parse(read('dapp.json'));
+  const visual = Object.fromEntries(manifest.tests.filter((entry) => entry.visual).map((entry) => [entry.id, entry]));
+  for (const id of ['shelf.favorites', 'shelf.collections', 'collection.detail']) {
+    assert.ok(visual[id], `${id} is declared`);
+    assert.ok(visual[id].expectText || visual[id].expectSelector, `${id} asserts a settled state`);
+    assert.ok(visual[id].impact.some((glob) => glob === 'public/**'), `${id} tracks the frontend`);
+  }
+  // The favorites filter and the collection picker are reachable by URL, so a
+  // reviewer's screenshot lands on the changed screen rather than the home page.
+  const paths = manifest.tests.map((entry) => entry.path);
+  assert.ok(paths.includes('/?favorites=1&demo=1'));
+  assert.ok(paths.includes('/?recipe=v60-bright&shot=picker&demo=1'));
 });
 
 test('the shell has separate method, discovery, detail, and brew surfaces', () => {

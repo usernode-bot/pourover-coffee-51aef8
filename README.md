@@ -31,6 +31,11 @@ brewing.
 - Lets a brewer filter, inspect, edit, delete, and repeat journal entries. Each
   entry keeps an immutable snapshot of the exact recipe revision and scaled
   dose used for that brew.
+- Keeps a private shelf: star any recipe as a favorite, find the recipes you
+  brewed most recently, and arrange personal collections that preserve the
+  order you set. Favorites and collections follow a recipe when it gains a new
+  revision, because membership is keyed by the stable recipe id.
+- Filters the recipe library down to favorites, recently brewed, or both.
 - Versions recipes under stable ids. Current recipe links stay canonical while
   historical journal entries can still open and repeat an older revision.
 - Remembers a preferred dose for each recipe in local storage. Existing
@@ -54,9 +59,10 @@ npm start
 
 Homeroom supplies authentication and runtime environment variables in hosted
 deployments. The app keeps the scaffold's deny-by-default JWT verification.
-Set `DATABASE_URL` to a PostgreSQL database to enable the brew journal. Its
-boot-time schema is idempotent and the journal table is marked
-`staging:private`, so staged proposals never receive production journal rows.
+Set `DATABASE_URL` to a PostgreSQL database to enable the brew journal and the
+recipe shelf. Both boot-time schemas are idempotent, and `brew_journal_entries`,
+`recipe_favorites`, `user_collections`, and `collection_recipes` are marked
+`staging:private`, so staged proposals never receive production rows.
 
 ## Structure
 
@@ -68,9 +74,11 @@ boot-time schema is idempotent and the journal table is marked
   dose-scaling logic.
 - `public/glossary.js`: glossary copy, category grouping, search, and the
   mappings from taxonomy values and timer steps to terms.
-- `public/app.js`: navigation, rendering, local preferences, timer, and journal
-  interactions.
+- `public/app.js`: navigation, rendering, local preferences, timer, journal,
+  and shelf interactions.
 - `journal-store.js`: validated and user-scoped PostgreSQL journal storage.
+- `collection-store.js`: validated and user-scoped storage for favorites,
+  personal collections, and their recipe order.
 - `server.js`: Homeroom authentication, journal API, static serving, deep
   links, and graceful shutdown.
 - `tests/glossary.test.js`: content-integrity checks for glossary copy,
