@@ -342,6 +342,8 @@
       || (window.PouroverOffline ? window.PouroverOffline.tokenForOfflineUse() : '')
       || '';
   })();
+  const CUE_ENABLED = typeof CUE_EVENTS !== 'undefined' && Boolean(createCueRunner);
+
   const state = {
     screen: 'library',
     method: METHODS[0],
@@ -398,8 +400,6 @@
       steps: [],
     },
   };
-
-  const CUE_ENABLED = typeof CUE_EVENTS !== 'undefined' && Boolean(createCueRunner);
 
   function loadCueSettings() {
     if (!CUE_ENABLED) return null;
