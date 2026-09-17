@@ -1543,6 +1543,297 @@ textarea:focus-visible,
   opacity: 0.66;
 }
 
+
+/* ---- Personal shelf: favorites, collections, recently brewed ---- */
+
+.app-nav {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.shelf-filter-chip {
+  display: inline-flex;
+  min-height: 2.6rem;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid #d8cabc;
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  background: rgba(255, 252, 246, 0.7);
+  color: #6c5647;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.shelf-filter-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent), white 42%);
+  background: color-mix(in srgb, var(--accent), white 84%);
+  color: color-mix(in srgb, var(--accent), #2d2119 22%);
+}
+
+.shelf-filter-chip > span[aria-hidden] {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.shelf-filter-count {
+  min-width: 1.45rem;
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
+  background: rgba(44, 33, 26, 0.08);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.shelf-filter-chip[aria-pressed="true"] .shelf-filter-count {
+  background: rgba(44, 33, 26, 0.12);
+}
+
+.recipe-actions {
+  align-items: center;
+}
+
+.shelf-action {
+  display: inline-flex;
+  min-height: 2.85rem;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #d8cabc;
+  border-radius: 999px;
+  padding: 0.55rem 0.95rem;
+  background: rgba(255, 252, 246, 0.78);
+  color: #6c5647;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.shelf-action-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.shelf-action[aria-pressed="true"] {
+  border-color: #c1663f;
+  background: #fbe9df;
+  color: #8a3f24;
+}
+
+.shelf-action[disabled] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.shelf-tabs {
+  display: flex;
+  gap: 0.35rem;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(86, 63, 47, 0.14);
+  padding-bottom: 0.35rem;
+  scrollbar-width: none;
+}
+
+.shelf-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.shelf-tab {
+  min-height: 2.6rem;
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  background: transparent;
+  color: #7b6657;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.shelf-tab[aria-selected="true"] {
+  background: rgba(44, 33, 26, 0.07);
+  color: #33251c;
+}
+
+.shelf-card-wrap {
+  position: relative;
+  display: flex;
+}
+
+.shelf-card-wrap > .brew-recipe-card {
+  flex: 1;
+}
+
+/* Keep the heart clear of the card's top-right meta line. */
+.shelf-card-wrap .brew-recipe-topline {
+  padding-right: 2.6rem;
+}
+
+.favorite-toggle {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  display: grid;
+  width: 2.6rem;
+  height: 2.6rem;
+  place-items: center;
+  border: 1px solid rgba(91, 66, 49, 0.16);
+  border-radius: 50%;
+  background: rgba(255, 252, 246, 0.94);
+  color: #8a7565;
+  font-size: 1.05rem;
+  line-height: 1;
+  box-shadow: 0 6px 16px rgba(70, 47, 31, 0.1);
+}
+
+.favorite-toggle[aria-pressed="true"] {
+  border-color: #c1663f;
+  background: #fbe9df;
+  color: #b04a28;
+}
+
+.collection-card {
+  display: flex;
+  min-height: 12rem;
+  flex-direction: column;
+  border: 1px solid rgba(91, 66, 49, 0.14);
+  border-radius: 1.45rem;
+  padding: 1.05rem;
+  background: linear-gradient(150deg, rgba(255, 252, 247, 0.98), rgba(233, 223, 209, 0.72));
+  box-shadow: 0 12px 28px rgba(70, 47, 31, 0.07);
+}
+
+.collection-card[data-reordering="true"] {
+  border-color: color-mix(in srgb, var(--accent), white 40%);
+  box-shadow: 0 18px 36px rgba(70, 47, 31, 0.14);
+}
+
+.collection-open {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.collection-card-title {
+  display: block;
+  font-size: 1.2rem;
+  font-weight: 720;
+  letter-spacing: -0.03em;
+}
+
+.collection-card-meta {
+  display: block;
+  margin-top: 0.4rem;
+  color: #7d6757;
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.collection-card-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.9rem;
+}
+
+.collection-preview-chip {
+  border: 1px solid color-mix(in srgb, var(--card-accent, #a84f32), white 72%);
+  border-radius: 999px;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 252, 247, 0.72);
+  color: #685346;
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.collection-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.collection-mini-button {
+  min-height: 2.35rem;
+  border: 1px solid #d8cabc;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  background: rgba(255, 252, 246, 0.8);
+  color: #6c5647;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.collection-mini-button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.collection-mini-button.danger {
+  border-color: #d3a596;
+  color: #93412f;
+}
+
+.collection-create {
+  display: grid;
+  gap: 0.75rem;
+  border: 1px solid rgba(95, 70, 51, 0.13);
+  border-radius: 1.4rem;
+  padding: 1rem;
+  background: rgba(255, 252, 246, 0.72);
+}
+
+.collection-item-actions {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.shelf-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+}
+
+.shelf-picker-row label {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.65rem;
+  cursor: pointer;
+}
+
+.shelf-picker-name {
+  overflow: hidden;
+  color: #3f3027;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shelf-picker-count {
+  color: #8c7767;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.shelf-picker-row input[type="checkbox"] {
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
 @media (max-width: 639px) {
   .hero-panel {
     min-height: 27rem;

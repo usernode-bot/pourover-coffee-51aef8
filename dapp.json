@@ -1,7 +1,7 @@
 {
   "name": "Pourover Coffee",
   "icon": {
-    "emoji": "☕"
+    "emoji": "\u2615"
   },
   "secrets": [],
   "tests": [
@@ -41,7 +41,7 @@
       "id": "journal.history",
       "name": "Brew journal renders private history",
       "path": "/?journal=demo",
-      "expectText": "Staging demo: Finca El Jardín",
+      "expectText": "Staging demo: Finca El Jard\u00edn",
       "visual": true,
       "impact": [
         "public/**",
@@ -85,6 +85,77 @@
       "name": "Glossary search narrows the list",
       "path": "/?glossary=1&q=drawdown",
       "expectText": "Drawdown"
+    },
+    {
+      "name": "Library filters to favorites",
+      "path": "/?scope=favorites",
+      "expectSelector": "#filter-favorites[aria-pressed=\"true\"]"
+    },
+    {
+      "name": "Library filters to recently brewed recipes",
+      "path": "/?scope=recent",
+      "expectSelector": "#filter-recent[aria-pressed=\"true\"]"
+    },
+    {
+      "name": "A recipe shows its favorite and collection controls",
+      "path": "/?recipe=v60-bright",
+      "expectSelector": "#recipe-favorite[aria-pressed]"
+    },
+    {
+      "id": "shelf.favorites",
+      "name": "Shelf shows favorites and recently brewed recipes",
+      "path": "/?shelf=demo",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "server.js",
+        "shelf-store.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#favorites-list [data-recipe-id]"
+    },
+    {
+      "id": "shelf.collections",
+      "name": "Shelf manages personal collections",
+      "path": "/?shelf=demo&tab=collections",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "server.js",
+        "shelf-store.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#collection-list [data-collection-card]"
+    },
+    {
+      "id": "shelf.collection-detail",
+      "name": "A collection preserves its recipe order",
+      "path": "/?collection=900001&shelf=demo",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "server.js",
+        "shelf-store.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#collection-items [data-recipe-id]"
+    },
+    {
+      "id": "shelf.picker",
+      "name": "A recipe can join one or more collections",
+      "path": "/?recipe=v60-bright&picker=1",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "server.js",
+        "shelf-store.js",
+        "dapp.json"
+      ],
+      "expectSelector": "#recipe-collection-toggle[aria-expanded=\"true\"]"
     },
     {
       "id": "glossary.term-panel",

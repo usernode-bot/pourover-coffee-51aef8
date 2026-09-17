@@ -33,6 +33,17 @@ brewing.
   dose used for that brew.
 - Versions recipes under stable ids. Current recipe links stay canonical while
   historical journal entries can still open and repeat an older revision.
+- Turns the library into a personal shelf: favorite any recipe with one tap,
+  and browse a Favorites view or a Recently brewed view drawn from your own
+  brew history.
+- Groups recipes into named collections, with create, rename, reorder, and
+  delete, plus adding a recipe to one or more collections at a time. Order
+  inside a collection is preserved, and recipes are referenced by their stable
+  id, so a recipe that later receives a new revision keeps its place.
+- Filters the library down to favorites or recently brewed recipes without
+  losing the structured facet filters.
+- Keeps every shelf choice private to the signed-in user. Removing a collection
+  removes only the grouping, never the recipes or your brew history.
 - Remembers a preferred dose for each recipe in local storage. Existing
   method-level preferences remain valid as a fallback.
 - Exposes deterministic recipe and timer URLs for Homeroom proposal checks.
@@ -57,6 +68,10 @@ deployments. The app keeps the scaffold's deny-by-default JWT verification.
 Set `DATABASE_URL` to a PostgreSQL database to enable the brew journal. Its
 boot-time schema is idempotent and the journal table is marked
 `staging:private`, so staged proposals never receive production journal rows.
+The personal shelf is stored the same way: `recipe_favorites`,
+`recipe_collections`, and `recipe_collection_items` are all marked
+`staging:private`, so a staging preview starts with an empty shelf and shows
+its own `?shelf=demo` examples instead.
 
 ## Structure
 
@@ -71,8 +86,13 @@ boot-time schema is idempotent and the journal table is marked
 - `public/app.js`: navigation, rendering, local preferences, timer, and journal
   interactions.
 - `journal-store.js`: validated and user-scoped PostgreSQL journal storage.
-- `server.js`: Homeroom authentication, journal API, static serving, deep
-  links, and graceful shutdown.
+- `shelf-store.js`: validated and user-scoped storage for favorites,
+  collections, and collection membership.
+- `server.js`: Homeroom authentication, journal and shelf APIs, static
+  serving, deep links, and graceful shutdown.
 - `tests/glossary.test.js`: content-integrity checks for glossary copy,
   taxonomy coverage, and step mappings.
+- `tests/shelf.test.js`: validation, privacy markers, revision-stable
+  references, and the "removing a collection keeps recipes and brew history"
+  guarantee for the personal shelf.
 - `dapp.json`: the app icon and proposal checks.

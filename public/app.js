@@ -43,6 +43,8 @@
     journalDetail: document.getElementById('journal-detail-screen'),
     journalForm: document.getElementById('journal-form-screen'),
     glossary: document.getElementById('glossary-screen'),
+    shelf: document.getElementById('shelf-screen'),
+    collection: document.getElementById('collection-screen'),
   };
 
   const elements = {
@@ -180,6 +182,74 @@
     recipeRatioLabel: document.getElementById('recipe-ratio-label'),
     recipeWaterLabel: document.getElementById('recipe-water-label'),
     recipeGrindLabel: document.getElementById('recipe-grind-label'),
+    shelf: document.getElementById('shelf-button'),
+    shelfTabs: Array.from(document.querySelectorAll('[data-shelf-tab]')),
+    shelfPanels: Array.from(document.querySelectorAll('[data-shelf-panel]')),
+    shelfStatus: document.getElementById('shelf-status'),
+    shelfError: document.getElementById('shelf-error'),
+    shelfErrorCopy: document.getElementById('shelf-error-copy'),
+    shelfRetry: document.getElementById('shelf-retry'),
+    favoritesSummary: document.getElementById('favorites-summary'),
+    favoritesList: document.getElementById('favorites-list'),
+    favoritesEmpty: document.getElementById('favorites-empty'),
+    favoritesBrowse: document.getElementById('favorites-browse'),
+    favoritesEmptyBrowse: document.getElementById('favorites-empty-browse'),
+    recentSummary: document.getElementById('recent-summary'),
+    recentList: document.getElementById('recent-list'),
+    recentEmpty: document.getElementById('recent-empty'),
+    recentEmptyJournal: document.getElementById('recent-empty-journal'),
+    collectionsSummary: document.getElementById('collections-summary'),
+    collectionsNew: document.getElementById('collections-new'),
+    collectionCreateForm: document.getElementById('collection-create-form'),
+    collectionCreateName: document.getElementById('collection-create-name'),
+    collectionCreateError: document.getElementById('collection-create-error'),
+    collectionCreateCancel: document.getElementById('collection-create-cancel'),
+    collectionList: document.getElementById('collection-list'),
+    collectionsEmpty: document.getElementById('collections-empty'),
+    collectionsEmptyNew: document.getElementById('collections-empty-new'),
+    collectionsHint: document.getElementById('collections-hint'),
+    filterFavorites: document.getElementById('filter-favorites'),
+    filterRecent: document.getElementById('filter-recent'),
+    favoritesCount: document.getElementById('favorites-count'),
+    recentCount: document.getElementById('recent-count'),
+    recipeEmptyTitle: document.getElementById('recipe-empty-title'),
+    recipeEmptyCopy: document.getElementById('recipe-empty-copy'),
+    recipeFavorite: document.getElementById('recipe-favorite'),
+    recipeFavoriteLabel: document.getElementById('recipe-favorite-label'),
+    recipeCollectionToggle: document.getElementById('recipe-collection-toggle'),
+    recipeCollectionSummary: document.getElementById('recipe-collection-summary'),
+    shelfPicker: document.getElementById('shelf-picker'),
+    shelfPickerTitle: document.getElementById('shelf-picker-title'),
+    shelfPickerBackdrop: document.getElementById('shelf-picker-backdrop'),
+    shelfPickerClose: document.getElementById('shelf-picker-close'),
+    shelfPickerRecipe: document.getElementById('shelf-picker-recipe'),
+    shelfPickerStatus: document.getElementById('shelf-picker-status'),
+    shelfPickerList: document.getElementById('shelf-picker-list'),
+    shelfPickerEmpty: document.getElementById('shelf-picker-empty'),
+    shelfPickerCreate: document.getElementById('shelf-picker-create'),
+    shelfPickerName: document.getElementById('shelf-picker-name'),
+    shelfPickerError: document.getElementById('shelf-picker-error'),
+    shelfPickerDone: document.getElementById('shelf-picker-done'),
+    collectionEyebrow: document.getElementById('collection-eyebrow'),
+    collectionTitle: document.getElementById('collection-title'),
+    collectionSummary: document.getElementById('collection-summary'),
+    collectionStatus: document.getElementById('collection-status'),
+    collectionActions: document.getElementById('collection-actions'),
+    collectionRename: document.getElementById('collection-rename'),
+    collectionDelete: document.getElementById('collection-delete'),
+    collectionRenameForm: document.getElementById('collection-rename-form'),
+    collectionRenameName: document.getElementById('collection-rename-name'),
+    collectionRenameError: document.getElementById('collection-rename-error'),
+    collectionRenameCancel: document.getElementById('collection-rename-cancel'),
+    collectionDeleteConfirmation: document.getElementById('collection-delete-confirmation'),
+    collectionDeleteCancel: document.getElementById('collection-delete-cancel'),
+    collectionDeleteConfirm: document.getElementById('collection-delete-confirm'),
+    collectionItems: document.getElementById('collection-items'),
+    collectionEmpty: document.getElementById('collection-empty'),
+    collectionEmptyBrowse: document.getElementById('collection-empty-browse'),
+    collectionError: document.getElementById('collection-error'),
+    collectionErrorCopy: document.getElementById('collection-error-copy'),
+    collectionRetry: document.getElementById('collection-retry'),
   };
 
   const DOSE_STORAGE_KEY = 'pourover-coffee:doses:v1';
@@ -211,6 +281,24 @@
       formSource: 'manual',
       returnTo: 'journal',
     },
+    shelf: {
+      loaded: false,
+      loading: null,
+      demo: false,
+      tab: 'favorites',
+      favorites: [],
+      favoriteDates: {},
+      collections: [],
+      memberships: [],
+      recentlyBrewed: [],
+      collection: null,
+      collectionItems: [],
+      pickerRecipeId: null,
+      pickerOpen: false,
+      pickerTrigger: null,
+      loadedCollectionId: null,
+    },
+    libraryScope: '',
   };
 
   function loadDoses() {
@@ -348,10 +436,6 @@
       </button>`;
   }
 
-  function renderRecipeCards(container, recipes) {
-    container.innerHTML = recipes.map(recipeCard).join('');
-  }
-
   function populateFilters() {
     const methodSelect = elements.filters.elements.method;
     methodSelect.innerHTML = '<option value="">All methods</option>'
@@ -386,11 +470,25 @@
 
   function renderLibrary() {
     elements.methodList.innerHTML = METHODS.map(methodCard).join('');
-    const filtered = filterRecipes(state.filters);
+    const scoped = shelfScopeRecipes(state.libraryScope);
+    const filtered = scoped
+      ? scoped.filter((recipe) => filterRecipes(state.filters, [recipe]).length > 0)
+      : filterRecipes(state.filters);
     renderRecipeCards(elements.recipeList, filtered);
-    elements.resultCount.textContent = `${filtered.length} ${filtered.length === 1 ? 'recipe' : 'recipes'}`;
+    const scopeLabel = state.libraryScope === 'favorites' ? 'favorite'
+      : state.libraryScope === 'recent' ? 'brewed' : 'recipe';
+    elements.resultCount.textContent = `${filtered.length} ${filtered.length === 1 ? scopeLabel : `${scopeLabel}s`}`;
     elements.recipeList.hidden = filtered.length === 0;
     elements.emptyState.hidden = filtered.length !== 0;
+    elements.recipeEmptyTitle.textContent = state.libraryScope === 'favorites'
+      ? 'No favorites match yet'
+      : state.libraryScope === 'recent'
+        ? 'No recent brews match yet'
+        : 'No recipes match yet';
+    elements.recipeEmptyCopy.textContent = scoped
+      ? 'Tap the shelf filters off, or remove a filter to widen the set.'
+      : 'Try removing one filter to broaden the shelf.';
+    renderShelfFilters();
 
     for (const key of FILTER_KEYS) {
       elements.filters.elements[key].value = state.filters[key] || '';
@@ -486,6 +584,7 @@
     }).join('');
     elements.doseMinus.disabled = recipe.coffee <= MIN_COFFEE_GRAMS;
     elements.dosePlus.disabled = recipe.coffee >= MAX_COFFEE_GRAMS;
+    renderRecipeShelfControls();
   }
 
   function updateDose(value) {
@@ -607,6 +706,12 @@
       elements.back.hidden = screen === 'library';
       window.scrollTo({ top: 0, behavior: 'instant' });
       if (focus) screens[screen].querySelector('h1')?.focus({ preventScroll: true });
+      // Every screen's hearts are redrawn from the one shelf model as it comes
+      // up, so a card rendered on boot or on navigation never shows a stale
+      // favorite state. Card markup is written before this point, so the
+      // controls exist to sync.
+      syncAllFavoriteControls();
+      renderShelfFilters();
     };
     if (transition !== 'none' && window.unNative?.transition) {
       window.unNative.transition(mutate, { type: transition });
@@ -616,7 +721,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', ...TAG_KEYS]
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'scope', 'demo', 'picker', 'tab', ...TAG_KEYS]
       .forEach((key) => url.searchParams.delete(key));
   }
 
@@ -627,7 +732,13 @@
       for (const [key, value] of Object.entries(state.filters)) {
         url.searchParams.set(FILTER_PARAM[key] || key, value);
       }
+      if (state.libraryScope) url.searchParams.set('scope', state.libraryScope);
     }
+    if (screen === 'shelf') {
+      url.searchParams.set('shelf', state.shelf.demo ? 'demo' : '1');
+      if (state.shelf.tab !== 'favorites') url.searchParams.set('tab', state.shelf.tab);
+    }
+    if (screen === 'collection') url.searchParams.set('collection', id);
     if (screen === 'method') url.searchParams.set('method', id);
     if (screen === 'recipe') url.searchParams.set('recipe', id);
     if (screen === 'brew') url.searchParams.set('brew', id);
@@ -660,17 +771,157 @@
     return `${url.pathname}${url.search}${url.hash}`;
   }
 
+  // ---------------------------------------------------------------------
+  // Personal shelf: favorites, collections, and recently brewed recipes.
+  //
+  // Recipe ids are stable across revisions, so every shelf row stores the
+  // recipe id, never a revision id. A recipe that later gets a new revision
+  // keeps its place in every collection and stays favorited.
+  // ---------------------------------------------------------------------
+
+  function recipeById(recipeId) {
+    return RECIPES.find((recipe) => recipe.id === recipeId) || null;
+  }
+
+  function isFavorite(recipeId) {
+    return state.shelf.favorites.includes(recipeId);
+  }
+
+  function membershipFor(recipeId) {
+    return state.shelf.memberships.filter((entry) => entry.recipeId === recipeId);
+  }
+
+  function collectionsForRecipe(recipeId) {
+    const ids = new Set(membershipFor(recipeId).map((entry) => entry.collectionId));
+    return state.shelf.collections.filter((collection) => ids.has(collection.id));
+  }
+
+  function applyShelfPayload(payload) {
+    state.shelf.loaded = true;
+    state.shelf.demo = Boolean(payload.demo);
+    state.shelf.favorites = Array.isArray(payload.favorites) ? payload.favorites.slice() : [];
+    state.shelf.collections = Array.isArray(payload.collections) ? payload.collections.slice() : [];
+    state.shelf.memberships = Array.isArray(payload.memberships) ? payload.memberships.slice() : [];
+    state.shelf.recentlyBrewed = Array.isArray(payload.recentlyBrewed) ? payload.recentlyBrewed.slice() : [];
+    if (payload.collection) state.shelf.collection = payload.collection;
+    if (Array.isArray(payload.items)) state.shelf.collectionItems = payload.items.slice();
+  }
+
+  function shelfApiPath(path = '') {
+    const query = new URLSearchParams();
+    if (state.shelf.demo) query.set('demo', '1');
+    const suffix = query.toString();
+    return `/api/shelf${path}${suffix ? `?${suffix}` : ''}`;
+  }
+
+  function shelfRequest(path, options = {}) {
+    return apiFetch(shelfApiPath(path), options);
+  }
+
+  function shelfRequestFor(demo, path = '', options = {}) {
+    const query = new URLSearchParams();
+    if (demo) query.set('demo', '1');
+    const suffix = query.toString();
+    return apiFetch(`/api/shelf${path}${suffix ? `?${suffix}` : ''}`, options);
+  }
+
+  function shelfUnavailableMessage(error) {
+    return error?.message || 'Your favorites and collections could not be loaded.';
+  }
+
+  // Guarded load. The real shelf and the staging demo shelf are different data
+  // behind the same screen, so they get separate cache slots rather than
+  // letting a demo preview inherit whatever the first load happened to fetch.
+  // A failed load leaves the cached state untouched so a retry can recover it.
+  function ensureShelf({ demo = state.shelf.demo } = {}) {
+    if (state.shelf.loading && state.shelf.loadingDemo === demo) return state.shelf.loading;
+    if (state.shelf.loaded && state.shelf.loadedDemo === demo) return Promise.resolve(state.shelf);
+    state.shelf.loadingDemo = demo;
+    state.shelf.loading = shelfRequestFor(demo)
+      .then((payload) => {
+        applyShelfPayload(payload);
+        state.shelf.loadedDemo = demo;
+        state.shelf.loading = null;
+        syncAllFavoriteControls();
+        if (state.screen === 'shelf') renderShelf();
+        return state.shelf;
+      })
+      .catch((error) => {
+        state.shelf.loading = null;
+        throw error;
+      });
+    return state.shelf.loading;
+  }
+
+  // Favorites can be toggled from a card, a detail page, or a shelf list. After
+  // any shelf load, redraw every heart already on screen from the one source of
+  // truth so the same recipe never reads differently in two places.
+  function syncAllFavoriteControls() {
+    document.querySelectorAll('[data-favorite-toggle]').forEach((button) => {
+      const recipeId = button.dataset.favoriteToggle;
+      const favorite = isFavorite(recipeId);
+      button.setAttribute('aria-pressed', String(favorite));
+      const icon = button.querySelector('span[aria-hidden]');
+      if (icon) icon.textContent = favorite ? '♥' : '♡';
+      const recipe = recipeById(recipeId);
+      if (recipe) {
+        button.setAttribute('aria-label', favorite
+          ? `Remove ${recipe.title} from favorites`
+          : `Save ${recipe.title} to favorites`);
+      }
+    });
+    if (state.recipe) renderRecipeShelfControls();
+  }
+
+  function renderShelfCounts() {
+    elements.favoritesCount.textContent = String(state.shelf.favorites.length);
+    elements.recentCount.textContent = String(state.shelf.recentlyBrewed.length);
+  }
+
+  function shelfScopeRecipes(scope) {
+    if (scope === 'favorites') {
+      return state.shelf.favorites.map(recipeById).filter(Boolean);
+    }
+    if (scope === 'recent') {
+      return state.shelf.recentlyBrewed.map((entry) => recipeById(entry.recipeId)).filter(Boolean);
+    }
+    return null;
+  }
+
+  function renderShelfFilters() {
+    renderShelfCounts();
+    elements.filterFavorites.setAttribute('aria-pressed', String(state.libraryScope === 'favorites'));
+    elements.filterRecent.setAttribute('aria-pressed', String(state.libraryScope === 'recent'));
+  }
+
   function navigate(screen, id, { replace = false, focus = true, transition = 'push', shot } = {}) {
+    // The demo shelf is a property of those two screens, not a session mode. Any
+    // other screen reads the real shelf, so leaving the demo has to drop the
+    // flag rather than carry read-only behavior into the recipe and library
+    // screens the reader goes to next.
+    if (screen !== 'shelf' && screen !== 'collection' && state.shelf.demo) {
+      // Leaving the demo must also drop its data: the demo payload is not the
+      // reader's shelf, so keeping it would paint demo favorites as their own.
+      // Clearing the cache slot triggers a real reload; the hearts correct
+      // themselves when it lands.
+      state.shelf.demo = false;
+      state.shelf.loaded = false;
+      ensureShelf({ demo: false }).catch(() => {});
+    }
     if (screen === 'method') chooseMethod(id);
     if (screen === 'recipe' || screen === 'brew') chooseRecipe(id);
     if (screen === 'library') renderLibrary();
     if (screen === 'brew') renderBrewShell();
     if (screen === 'glossary') renderGlossary();
+    if (screen === 'shelf') renderShelf();
+    if (screen === 'collection') renderCollection();
     const canonicalId = screen === 'method'
       ? state.method.id
       : (screen === 'recipe' || screen === 'brew')
         ? recipeRouteReference(state.recipe)
-        : id;
+        : screen === 'collection'
+          ? state.shelf.collection?.id || id
+          : id;
     history[replace ? 'replaceState' : 'pushState']({ screen, id: canonicalId }, '', urlFor(screen, canonicalId, shot));
     showScreen(screen, { focus, transition });
   }
@@ -688,6 +939,22 @@
 
   function parseLocation({ focus = false } = {}) {
     const params = new URLSearchParams(window.location.search);
+    const shelfMode = params.get('shelf');
+    const collectionId = params.get('collection');
+    if (collectionId) {
+      openCollection(collectionId, { demo: shelfMode === 'demo', historyMode: null, focus, transition: 'none' });
+      return;
+    }
+    if (shelfMode === '1' || shelfMode === 'demo') {
+      openShelf({
+        demo: shelfMode === 'demo',
+        tab: params.get('tab') || 'favorites',
+        historyMode: null,
+        focus,
+        transition: 'none',
+      });
+      return;
+    }
     const journalMode = params.get('journal');
     const journalEntryId = params.get('entry');
     const journalEditId = params.get('edit');
@@ -765,6 +1032,7 @@
     if (recipeId && isKnownRecipeReference(recipeId)) {
       chooseRecipe(recipeId);
       showScreen('recipe', { focus, transition: 'none' });
+      if (params.get('picker') === '1') openShelfPicker(state.recipe.id, elements.recipeCollectionToggle);
       return;
     }
     if (methodId && METHODS.some((method) => method.id === methodId)) {
@@ -773,6 +1041,7 @@
       return;
     }
     state.filters = filtersFromLocation(params);
+    state.libraryScope = ['favorites', 'recent'].includes(params.get('scope')) ? params.get('scope') : '';
     renderLibrary();
     showScreen('library', { focus, transition: 'none' });
   }
@@ -787,6 +1056,7 @@
 
   function clearFilters() {
     state.filters = {};
+    state.libraryScope = '';
     renderLibrary();
     history.replaceState({ screen: 'library' }, '', urlFor('library'));
   }
@@ -875,6 +1145,361 @@
     if (historyMode) history[historyMode]({ screen: 'journal' }, '', urlFor('journal'));
     showScreen('journal', { focus, transition });
     loadJournal();
+  }
+
+  // ---------------------------------------------------------------------
+  // Shelf screens
+  // ---------------------------------------------------------------------
+
+  function shelfDemoNote() {
+    return state.shelf.demo
+      ? 'Showing read-only staging examples. Your own shelf uses the same layout and stays private.'
+      : '';
+  }
+
+  // The favorite heart rides on every recipe card. A staging demo card omits it
+  // rather than drawing a control that would refuse the tap.
+  function shelfCard(recipe, extra = '') {
+    const favorite = isFavorite(recipe.id);
+    const heart = state.shelf.demo ? '' : `
+        <button class="favorite-toggle un-touch-target" type="button" data-favorite-toggle="${escapeHtml(recipe.id)}"
+          aria-pressed="${favorite ? 'true' : 'false'}"
+          aria-label="${favorite ? `Remove ${escapeHtml(recipe.title)} from favorites` : `Save ${escapeHtml(recipe.title)} to favorites`}">
+          <span aria-hidden="true">${favorite ? '♥' : '♡'}</span>
+        </button>`;
+    return `
+      <div class="shelf-card-wrap">
+        ${recipeCard(recipe)}${heart}
+      </div>${extra}`;
+  }
+
+  function renderRecipeCards(container, recipes) {
+    container.innerHTML = recipes.map((recipe) => shelfCard(recipe)).join('');
+  }
+
+  function collectionCard(collection, index, total) {
+    const items = state.shelf.memberships
+      .filter((entry) => entry.collectionId === collection.id)
+      .sort((a, b) => a.position - b.position)
+      .map((entry) => recipeById(entry.recipeId))
+      .filter(Boolean);
+    const previews = items.slice(0, 3)
+      .map((recipe) => `<span class="collection-preview-chip">${escapeHtml(recipe.title)}</span>`)
+      .join('');
+    const more = items.length > 3 ? `<span class="collection-preview-chip">+${items.length - 3} more</span>` : '';
+    return `
+      <article class="collection-card" data-collection-card="${collection.id}" data-reordering="false">
+        <button class="collection-open" type="button" data-open-collection="${collection.id}">
+          <span class="collection-card-title">${escapeHtml(collection.name)}</span>
+          <span class="collection-card-meta">${collection.itemCount} ${collection.itemCount === 1 ? 'recipe' : 'recipes'}</span>
+          <span class="collection-card-previews">${previews}${more}</span>
+        </button>
+        ${state.shelf.demo ? '' : `<div class="collection-card-actions">
+          <button class="collection-mini-button" type="button" data-move-collection="${collection.id}" data-direction="up" ${index === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(collection.name)} up">Move up</button>
+          <button class="collection-mini-button" type="button" data-move-collection="${collection.id}" data-direction="down" ${index === total - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(collection.name)} down">Move down</button>
+          <button class="collection-mini-button" type="button" data-rename-collection="${collection.id}">Rename</button>
+          <button class="collection-mini-button danger" type="button" data-delete-collection="${collection.id}">Delete</button>
+        </div>`}
+      </article>`;
+  }
+
+  function renderShelf() {
+    renderShelfCounts();
+    const { favorites, recentlyBrewed } = state.shelf;
+    elements.shelfStatus.textContent = shelfDemoNote();
+
+    const favoriteRecipes = favorites.map(recipeById).filter(Boolean);
+    elements.favoritesSummary.textContent = favoriteRecipes.length
+      ? `${favoriteRecipes.length} saved ${favoriteRecipes.length === 1 ? 'recipe' : 'recipes'}`
+      : '';
+    elements.favoritesList.innerHTML = favoriteRecipes.map((recipe) => shelfCard(recipe)).join('');
+    elements.favoritesList.hidden = favoriteRecipes.length === 0;
+    elements.favoritesEmpty.hidden = favoriteRecipes.length !== 0;
+
+    const recentRecipes = recentlyBrewed.map((entry) => recipeById(entry.recipeId)).filter(Boolean);
+    elements.recentSummary.textContent = recentRecipes.length
+      ? `${recentRecipes.length} ${recentRecipes.length === 1 ? 'recipe' : 'recipes'} you have brewed`
+      : '';
+    elements.recentList.innerHTML = recentlyBrewed.map((entry) => {
+      const recipe = recipeById(entry.recipeId);
+      if (!recipe) return '';
+      const count = entry.brewCount === 1 ? 'Brewed once' : `Brewed ${entry.brewCount} times`;
+      return shelfCard(recipe, `<p class="mt-2 px-1 text-xs font-semibold text-[#8c7767]">${count} · last ${escapeHtml(formatDate(entry.lastBrewedAt))}</p>`);
+    }).join('');
+    elements.recentList.hidden = recentRecipes.length === 0;
+    elements.recentEmpty.hidden = recentRecipes.length !== 0;
+
+    elements.collectionsSummary.textContent = state.shelf.collections.length
+      ? `${state.shelf.collections.length} ${state.shelf.collections.length === 1 ? 'collection' : 'collections'}`
+      : '';
+    elements.collectionList.innerHTML = state.shelf.collections
+      .map((collection, index, all) => collectionCard(collection, index, all.length)).join('');
+    elements.collectionsEmpty.hidden = state.shelf.collections.length !== 0;
+    elements.collectionsHint.hidden = state.shelf.collections.length === 0;
+
+    // Staging examples are read-only, so the controls that would write are
+    // disabled with a visible explanation instead of failing on use.
+    for (const control of [elements.collectionsNew, elements.collectionsEmptyNew]) {
+      control.disabled = state.shelf.demo;
+      control.setAttribute('aria-disabled', String(state.shelf.demo));
+    }
+    elements.collectionsHint.textContent = state.shelf.demo
+      ? 'These staging examples are read-only. Save a collection of your own to try reordering.'
+      : 'Use the arrow buttons to set the order you want. Deleting a collection only removes the grouping. Your recipes and brew history stay put.';
+
+    elements.shelfTabs.forEach((tab) => {
+      tab.setAttribute('aria-selected', String(tab.dataset.shelfTab === state.shelf.tab));
+    });
+    elements.shelfPanels.forEach((panel) => {
+      panel.hidden = panel.dataset.shelfPanel !== state.shelf.tab;
+    });
+  }
+
+  async function loadShelfScreen() {
+    elements.shelfError.hidden = true;
+    // Only announce loading when there is genuinely nothing on screen yet, so
+    // returning to an already-loaded shelf does not flash over the cards.
+    if (!(state.shelf.loaded && state.shelf.loadedDemo === state.shelf.demo)) {
+      elements.shelfStatus.textContent = 'Loading your shelf…';
+    }
+    try {
+      await ensureShelf();
+      renderShelf();
+    } catch (error) {
+      elements.shelfStatus.textContent = '';
+      elements.shelfErrorCopy.textContent = shelfUnavailableMessage(error);
+      elements.shelfError.hidden = false;
+    }
+  }
+
+  // Defaults to whatever tab the reader was last on, so returning to the shelf
+  // from a collection lands back on Collections rather than jumping to
+  // Favorites.
+  function openShelf({ demo = false, tab = state.shelf.tab, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    closeTerm({ restoreFocus: false });
+    closeShelfPicker({ restoreFocus: false });
+    state.shelf.tab = ['favorites', 'recent', 'collections'].includes(tab) ? tab : 'favorites';
+    state.shelf.demo = demo;
+    if (historyMode) history[historyMode]({ screen: 'shelf' }, '', urlFor('shelf'));
+    showScreen('shelf', { focus, transition });
+    loadShelfScreen();
+  }
+
+  function renderCollection() {
+    const collection = state.shelf.collection;
+    if (!collection) return;
+    const items = state.shelf.collectionItems;
+    elements.collectionEyebrow.textContent = state.shelf.demo ? 'Collection · staging demo' : 'Collection';
+    elements.collectionTitle.textContent = collection.name;
+    elements.collectionSummary.textContent = items.length
+      ? `${items.length} ${items.length === 1 ? 'recipe' : 'recipes'} in the order you saved them.`
+      : 'Nothing saved here yet.';
+    elements.collectionStatus.textContent = shelfDemoNote();
+    elements.collectionActions.hidden = state.shelf.demo;
+    elements.collectionItems.innerHTML = items.map((item, index) => {
+      const recipe = recipeById(item.recipeId);
+      if (!recipe) return '';
+      const actions = state.shelf.demo ? '' : `
+        <div class="collection-item-actions">
+          <button class="collection-mini-button" type="button" data-move-item="${escapeHtml(item.recipeId)}" data-direction="up" ${index === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(recipe.title)} up">Move up</button>
+          <button class="collection-mini-button" type="button" data-move-item="${escapeHtml(item.recipeId)}" data-direction="down" ${index === items.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(recipe.title)} down">Move down</button>
+          <button class="collection-mini-button danger" type="button" data-remove-item="${escapeHtml(item.recipeId)}">Remove</button>
+        </div>`;
+      return shelfCard(recipe, actions);
+    }).join('');
+    elements.collectionItems.hidden = items.length === 0;
+    elements.collectionEmpty.hidden = items.length !== 0;
+    elements.collectionRenameForm.hidden = true;
+    elements.collectionDeleteConfirmation.hidden = true;
+  }
+
+  async function loadCollection(id, { demo = false } = {}) {
+    state.shelf.demo = demo || state.shelf.demo;
+    const payload = await shelfRequestFor(state.shelf.demo, `/collections/${encodeURIComponent(id)}`);
+    applyShelfPayload(payload);
+    state.shelf.loadedCollectionId = Number(id);
+    return payload;
+  }
+
+  async function openCollection(id, { demo = false, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    closeTerm({ restoreFocus: false });
+    closeShelfPicker({ restoreFocus: false });
+    state.shelf.demo = demo;
+    state.shelf.collection = state.shelf.collections.find((entry) => String(entry.id) === String(id)) || {
+      id: Number(id), name: 'Loading collection', itemCount: 0,
+    };
+    state.shelf.collectionItems = [];
+    elements.collectionTitle.textContent = 'Loading collection';
+    elements.collectionSummary.textContent = '';
+    elements.collectionError.hidden = true;
+    elements.collectionItems.innerHTML = '';
+    if (historyMode) history[historyMode]({ screen: 'collection', id }, '', urlFor('collection', id));
+    showScreen('collection', { focus, transition });
+    try {
+      await loadCollection(id);
+      renderCollection();
+    } catch (error) {
+      elements.collectionTitle.textContent = 'Collection unavailable';
+      elements.collectionErrorCopy.textContent = error.message;
+      elements.collectionError.hidden = false;
+      elements.collectionActions.hidden = true;
+    }
+  }
+
+  // ---- favorite + membership mutations ----
+
+  // A staging demo shelf is fake data standing in for the visitor's own, so its
+  // controls must not write: the API would happily store the change against the
+  // real signed-in account. Every mutation and the markup that offers it check
+  // this one predicate.
+  function shelfReadOnly() {
+    if (!state.shelf.demo) return false;
+    window.unNative?.toast?.('Staging examples are read-only. Save your own favorites to try this.');
+    return true;
+  }
+
+  async function toggleFavorite(recipeId) {
+    const recipe = recipeById(recipeId);
+    if (!recipe || shelfReadOnly()) return;
+    const next = !isFavorite(recipeId);
+    if (next) state.shelf.favorites.push(recipeId);
+    else state.shelf.favorites = state.shelf.favorites.filter((id) => id !== recipeId);
+    syncFavoriteControls(recipeId);
+    renderShelfFilters();
+    try {
+      await shelfRequest(`/favorites/${encodeURIComponent(recipeId)}`, {
+        method: 'PUT', body: JSON.stringify({ favorite: next }),
+      });
+    } catch (error) {
+      if (next) state.shelf.favorites = state.shelf.favorites.filter((id) => id !== recipeId);
+      else state.shelf.favorites.push(recipeId);
+      syncFavoriteControls(recipeId);
+      renderShelfFilters();
+      window.unNative?.toast?.(error.message || 'That favorite could not be saved.');
+    }
+  }
+
+  function syncFavoriteControls(recipeId) {
+    const favorite = isFavorite(recipeId);
+    document.querySelectorAll(`[data-favorite-toggle="${CSS.escape(recipeId)}"]`).forEach((button) => {
+      button.setAttribute('aria-pressed', String(favorite));
+      const icon = button.querySelector('span[aria-hidden]');
+      if (icon) icon.textContent = favorite ? '♥' : '♡';
+      const recipe = recipeById(recipeId);
+      if (recipe) {
+        button.setAttribute('aria-label', favorite
+          ? `Remove ${recipe.title} from favorites`
+          : `Save ${recipe.title} to favorites`);
+      }
+    });
+    if (state.recipe?.id === recipeId) renderRecipeShelfControls();
+    if (state.screen === 'collection' && state.shelf.collectionItems.length) renderCollection();
+    if (state.screen === 'shelf') renderShelf();
+    // Inside a shelf scope the library list is a projection of exactly this
+    // state, so a membership change has to redraw it, not just the hearts.
+    if (state.screen === 'library' && state.libraryScope) renderLibrary();
+  }
+
+  async function setCollectionMembership(collectionId, recipeId, member) {
+    if (shelfReadOnly()) return;
+    if (member) {
+      await shelfRequest(`/collections/${collectionId}/items/${encodeURIComponent(recipeId)}`, {
+        method: 'PUT', body: JSON.stringify({ recipeId }),
+      });
+      const existing = state.shelf.memberships.filter((entry) => !(entry.collectionId === collectionId && entry.recipeId === recipeId));
+      const collection = state.shelf.collections.find((entry) => entry.id === collectionId);
+      existing.push({
+        collectionId,
+        collectionName: collection?.name || '',
+        recipeId,
+        position: existing.filter((entry) => entry.collectionId === collectionId).length,
+      });
+      state.shelf.memberships = existing;
+    } else {
+      const response = await fetch(shelfApiPath(`/collections/${collectionId}/items/${encodeURIComponent(recipeId)}`), {
+        method: 'DELETE',
+        headers: { ...(APP_TOKEN ? { 'x-usernode-token': APP_TOKEN } : {}) },
+      });
+      if (!response.ok && response.status !== 204) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error || 'That recipe could not be removed.');
+      }
+      state.shelf.memberships = state.shelf.memberships
+        .filter((entry) => !(entry.collectionId === collectionId && entry.recipeId === recipeId));
+    }
+    state.shelf.collections = state.shelf.collections.map((collection) => ({
+      ...collection,
+      itemCount: state.shelf.memberships.filter((entry) => entry.collectionId === collection.id).length,
+    }));
+  }
+
+  function renderRecipeShelfControls() {
+    const recipe = state.recipe;
+    if (!recipe) return;
+    const favorite = isFavorite(recipe.id);
+    elements.recipeFavorite.setAttribute('aria-pressed', String(favorite));
+    elements.recipeFavoriteLabel.textContent = favorite ? 'Saved to favorites' : 'Save to favorites';
+    elements.recipeFavorite.querySelector('span[aria-hidden]').textContent = favorite ? '♥' : '♡';
+    const collections = collectionsForRecipe(recipe.id);
+    elements.recipeCollectionSummary.textContent = collections.length
+      ? `In ${collections.map((collection) => collection.name).join(', ')}`
+      : 'Not in a collection yet';
+  }
+
+  // ---- shelf picker (add a recipe to one or more collections) ----
+
+  function renderShelfPicker() {
+    const recipeId = state.shelf.pickerRecipeId;
+    const recipe = recipeId ? recipeById(recipeId) : null;
+    if (!recipe) return;
+    elements.shelfPickerRecipe.textContent = recipe.title;
+    const memberIds = new Set(membershipFor(recipeId).map((entry) => entry.collectionId));
+    elements.shelfPickerList.innerHTML = state.shelf.collections.map((collection) => `
+      <div class="shelf-picker-row">
+        <label>
+          <input type="checkbox" class="un-switch" data-picker-collection="${collection.id}" ${memberIds.has(collection.id) ? 'checked' : ''}>
+          <span class="shelf-picker-name">${escapeHtml(collection.name)}</span>
+        </label>
+        <span class="shelf-picker-count">${collection.itemCount} ${collection.itemCount === 1 ? 'recipe' : 'recipes'}</span>
+      </div>`).join('');
+    elements.shelfPickerEmpty.hidden = state.shelf.collections.length !== 0;
+    elements.shelfPickerStatus.textContent = state.shelf.demo
+      ? 'Read-only staging examples. Save something of your own to try this.'
+      : '';
+  }
+
+  async function openShelfPicker(recipeId, trigger) {
+    // Only one modal surface at a time, so the inert/screen-reader state has a
+    // single owner and closing one panel never un-inerts the other.
+    closeTerm({ restoreFocus: false });
+    state.shelf.pickerRecipeId = recipeId;
+    state.shelf.pickerTrigger = trigger || null;
+    state.shelf.pickerOpen = true;
+    elements.recipeCollectionToggle.setAttribute('aria-expanded', 'true');
+    elements.shelfPicker.hidden = false;
+    elements.shelfPickerError.hidden = true;
+    elements.shelfPickerCreate.reset();
+    document.body.classList.add('term-open');
+    document.getElementById('app-shell').inert = true;
+    elements.shelfPickerTitle.focus({ preventScroll: true });
+    try {
+      await ensureShelf();
+    } catch (error) {
+      elements.shelfPickerStatus.textContent = shelfUnavailableMessage(error);
+    }
+    renderShelfPicker();
+  }
+
+  function closeShelfPicker({ restoreFocus = true } = {}) {
+    if (!state.shelf.pickerOpen) return;
+    const trigger = state.shelf.pickerTrigger;
+    state.shelf.pickerOpen = false;
+    state.shelf.pickerRecipeId = null;
+    elements.shelfPicker.hidden = true;
+    elements.recipeCollectionToggle.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('term-open');
+    if (!state.term.open) document.getElementById('app-shell').inert = false;
+    if (restoreFocus && trigger && document.contains(trigger)) trigger.focus({ preventScroll: true });
   }
 
   function definitionRows(rows) {
@@ -1287,9 +1912,21 @@
   }
 
   function handleRecipeCardClick(event) {
+    const favorite = event.target.closest('[data-favorite-toggle]');
+    if (favorite) {
+      toggleFavorite(favorite.dataset.favoriteToggle);
+      return;
+    }
     const card = event.target.closest('[data-recipe-id]');
     if (card) navigate('recipe', card.dataset.recipeId, { transition: 'push' });
   }
+
+  function setLibraryScope(scope) {
+    state.libraryScope = state.libraryScope === scope ? '' : scope;
+    renderLibrary();
+    history.replaceState({ screen: 'library' }, '', urlFor('library'));
+  }
+
 
   elements.methodList.addEventListener('click', (event) => {
     const card = event.target.closest('[data-method-id]');
@@ -1297,6 +1934,14 @@
   });
   elements.recipeList.addEventListener('click', handleRecipeCardClick);
   elements.methodRecipeList.addEventListener('click', handleRecipeCardClick);
+  elements.favoritesList.addEventListener('click', handleRecipeCardClick);
+  elements.recentList.addEventListener('click', handleRecipeCardClick);
+  elements.filterFavorites.addEventListener('click', () => setLibraryScope('favorites'));
+  elements.filterRecent.addEventListener('click', () => setLibraryScope('recent'));
+  elements.favoritesBrowse.addEventListener('click', () => navigate('library', null, { transition: 'pop' }));
+  elements.favoritesEmptyBrowse.addEventListener('click', () => navigate('library', null, { transition: 'pop' }));
+  elements.collectionEmptyBrowse.addEventListener('click', () => navigate('library', null, { transition: 'pop' }));
+  elements.recentEmptyJournal.addEventListener('click', () => openJournal());
   elements.filters.addEventListener('change', updateFilters);
   elements.activeFilters.addEventListener('click', (event) => {
     const chip = event.target.closest('[data-remove-filter]');
@@ -1338,6 +1983,321 @@
   }));
   elements.brewAgain.addEventListener('click', () => { resetTimer(); toggleTimer(); });
   elements.returnToRecipe.addEventListener('click', () => navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' }));
+  elements.shelf.addEventListener('click', () => openShelf());
+  elements.shelfTabs.forEach((tab) => tab.addEventListener('click', () => {
+    state.shelf.tab = tab.dataset.shelfTab;
+    renderShelf();
+    history.replaceState({ screen: 'shelf' }, '', urlFor('shelf'));
+  }));
+  elements.shelfRetry.addEventListener('click', loadShelfScreen);
+  elements.collectionRetry.addEventListener('click', () => openCollection(state.shelf.collection?.id, { demo: state.shelf.demo, historyMode: 'replaceState' }));
+
+  elements.collectionsNew.addEventListener('click', () => {
+    elements.collectionCreateForm.hidden = false;
+    elements.collectionCreateError.hidden = true;
+    elements.collectionCreateName.focus({ preventScroll: true });
+  });
+  elements.collectionsEmptyNew.addEventListener('click', () => {
+    elements.collectionCreateForm.hidden = false;
+    elements.collectionCreateError.hidden = true;
+    elements.collectionCreateName.focus({ preventScroll: true });
+  });
+  elements.collectionCreateCancel.addEventListener('click', () => {
+    elements.collectionCreateForm.hidden = true;
+    elements.collectionCreateError.hidden = true;
+    elements.collectionsNew.focus({ preventScroll: true });
+  });
+  elements.collectionCreateForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (shelfReadOnly()) return;
+    const name = elements.collectionCreateName.value;
+    elements.collectionCreateError.hidden = true;
+    try {
+      const payload = await shelfRequest('/collections', { method: 'POST', body: JSON.stringify({ name }) });
+      state.shelf.collections = [...state.shelf.collections, payload.collection];
+      elements.collectionCreateForm.reset();
+      elements.collectionCreateForm.hidden = true;
+      state.shelf.tab = 'collections';
+      renderShelf();
+      history.replaceState({ screen: 'shelf' }, '', urlFor('shelf'));
+    } catch (error) {
+      elements.collectionCreateError.textContent = error.message;
+      elements.collectionCreateError.hidden = false;
+    }
+  });
+
+  // Renaming and deleting happen from the collection card itself, so a button
+  // labeled Rename renames rather than opening a screen the reader must then
+  // act on. The native kit supplies the dialog where it is available; the
+  // browser's own prompt and confirm are the standalone fallback.
+  async function promptCollectionName(currentName) {
+    if (window.unNative?.alert) {
+      const result = await window.unNative.alert({
+        title: 'Rename collection',
+        message: 'Choose a name you will recognize on your shelf.',
+        field: { placeholder: 'Collection name', value: currentName },
+        buttons: [
+          { label: 'Cancel', style: 'cancel' },
+          { label: 'Save name', style: 'default' },
+        ],
+      });
+      if (result.button !== 'Save name') return null;
+      return result.value;
+    }
+    return window.prompt('Rename collection', currentName);
+  }
+
+  async function confirmDeleteCollection(name) {
+    const message = 'The recipes stay in your library and your brew history is untouched. Only this grouping goes away.';
+    if (window.unNative?.actionSheet) {
+      const choice = await window.unNative.actionSheet({
+        title: `Delete "${name}"?`,
+        actions: [{ label: 'Delete collection', destructive: true }],
+      });
+      return Boolean(choice);
+    }
+    return window.confirm(`Delete "${name}"?\n\n${message}`);
+  }
+
+  elements.collectionList.addEventListener('click', async (event) => {
+    const open = event.target.closest('[data-open-collection]');
+    if (open) return openCollection(open.dataset.openCollection);
+    const rename = event.target.closest('[data-rename-collection]');
+    if (rename) return renameCollectionById(Number(rename.dataset.renameCollection));
+    const remove = event.target.closest('[data-delete-collection]');
+    if (remove) return deleteCollectionById(Number(remove.dataset.deleteCollection));
+    const move = event.target.closest('[data-move-collection]');
+    if (move) return moveCollection(Number(move.dataset.moveCollection), move.dataset.direction);
+    return undefined;
+  });
+
+  async function renameCollectionById(collectionId) {
+    const collection = state.shelf.collections.find((entry) => entry.id === collectionId);
+    if (!collection || shelfReadOnly()) return;
+    const requested = await promptCollectionName(collection.name);
+    if (requested === null || requested === undefined) return;
+    const name = String(requested).replace(/\s+/g, ' ').trim();
+    if (!name) {
+      window.unNative?.toast?.('Give the collection a name.');
+      return;
+    }
+    try {
+      const payload = await shelfRequest(`/collections/${collectionId}`, {
+        method: 'PATCH', body: JSON.stringify({ name }),
+      });
+      state.shelf.collections = state.shelf.collections
+        .map((entry) => (entry.id === collectionId ? { ...entry, ...payload.collection } : entry));
+      state.shelf.memberships = state.shelf.memberships
+        .map((entry) => (entry.collectionId === collectionId ? { ...entry, collectionName: payload.collection.name } : entry));
+      renderShelf();
+    } catch (error) {
+      window.unNative?.toast?.(error.message || 'That name could not be saved.');
+    }
+  }
+
+  async function deleteCollectionById(collectionId) {
+    const collection = state.shelf.collections.find((entry) => entry.id === collectionId);
+    if (!collection || shelfReadOnly()) return;
+    if (!(await confirmDeleteCollection(collection.name))) return;
+    try {
+      await shelfRequest(`/collections/${collectionId}`, { method: 'DELETE' });
+      state.shelf.collections = state.shelf.collections.filter((entry) => entry.id !== collectionId);
+      state.shelf.memberships = state.shelf.memberships.filter((entry) => entry.collectionId !== collectionId);
+      renderShelf();
+    } catch (error) {
+      elements.shelfStatus.textContent = '';
+      elements.shelfErrorCopy.textContent = error.message || 'That collection could not be deleted.';
+      elements.shelfError.hidden = false;
+    }
+  }
+
+  async function moveCollection(collectionId, direction) {
+    if (shelfReadOnly()) return;
+    const ordered = state.shelf.collections.slice().sort((a, b) => a.position - b.position);
+    const index = ordered.findIndex((collection) => collection.id === collectionId);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= ordered.length) return;
+    [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
+    const previous = state.shelf.collections;
+    state.shelf.collections = ordered.map((collection, position) => ({ ...collection, position }));
+    renderShelf();
+    try {
+      const payload = await shelfRequest('/collections/order', {
+        method: 'PUT', body: JSON.stringify({ collectionIds: ordered.map((collection) => collection.id) }),
+      });
+      if (payload.collections) state.shelf.collections = payload.collections;
+    } catch (error) {
+      state.shelf.collections = previous;
+      window.unNative?.toast?.(error.message || 'That order could not be saved.');
+    }
+    renderShelf();
+  }
+
+  elements.collectionItems.addEventListener('click', (event) => {
+    const favorite = event.target.closest('[data-favorite-toggle]');
+    if (favorite) return toggleFavorite(favorite.dataset.favoriteToggle);
+    const remove = event.target.closest('[data-remove-item]');
+    if (remove) return removeCollectionItem(remove.dataset.removeItem);
+    const move = event.target.closest('[data-move-item]');
+    if (move) return moveCollectionItem(move.dataset.moveItem, move.dataset.direction);
+    return handleRecipeCardClick(event);
+  });
+
+  async function removeCollectionItem(recipeId) {
+    const collectionId = state.shelf.collection?.id;
+    if (!collectionId || shelfReadOnly()) return;
+    const previous = state.shelf.collectionItems;
+    state.shelf.collectionItems = previous.filter((item) => item.recipeId !== recipeId);
+    try {
+      await setCollectionMembership(collectionId, recipeId, false);
+      state.shelf.collection = { ...state.shelf.collection, itemCount: state.shelf.collectionItems.length };
+      renderCollection();
+    } catch (error) {
+      state.shelf.collectionItems = previous;
+      renderCollection();
+      window.unNative?.toast?.(error.message || 'That recipe could not be removed.');
+    }
+  }
+
+  async function moveCollectionItem(recipeId, direction) {
+    const collectionId = state.shelf.collection?.id;
+    if (!collectionId || shelfReadOnly()) return;
+    const items = state.shelf.collectionItems.slice().sort((a, b) => a.position - b.position);
+    const index = items.findIndex((item) => item.recipeId === recipeId);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index < 0 || target < 0 || target >= items.length) return;
+    [items[index], items[target]] = [items[target], items[index]];
+    const previous = state.shelf.collectionItems;
+    state.shelf.collectionItems = items.map((item, position) => ({ ...item, position }));
+    renderCollection();
+    try {
+      await shelfRequest(`/collections/${collectionId}/order`, {
+        method: 'PUT', body: JSON.stringify({ recipeIds: items.map((item) => item.recipeId) }),
+      });
+    } catch (error) {
+      state.shelf.collectionItems = previous;
+      window.unNative?.toast?.(error.message || 'That order could not be saved.');
+    }
+    renderCollection();
+  }
+
+  elements.collectionRename.addEventListener('click', () => {
+    elements.collectionRenameForm.hidden = false;
+    elements.collectionRenameError.hidden = true;
+    elements.collectionRenameName.value = state.shelf.collection?.name || '';
+    elements.collectionRenameName.focus({ preventScroll: true });
+  });
+  elements.collectionRenameCancel.addEventListener('click', () => {
+    elements.collectionRenameForm.hidden = true;
+    elements.collectionRenameError.hidden = true;
+    elements.collectionRename.focus({ preventScroll: true });
+  });
+  elements.collectionRenameForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const collectionId = state.shelf.collection?.id;
+    if (!collectionId || shelfReadOnly()) return;
+    elements.collectionRenameError.hidden = true;
+    try {
+      const payload = await shelfRequest(`/collections/${collectionId}`, {
+        method: 'PATCH', body: JSON.stringify({ name: elements.collectionRenameName.value }),
+      });
+      state.shelf.collection = { ...state.shelf.collection, ...payload.collection };
+      state.shelf.collections = state.shelf.collections.map((collection) => (
+        collection.id === state.shelf.collection.id ? { ...collection, ...payload.collection } : collection
+      ));
+      elements.collectionRenameForm.hidden = true;
+      renderCollection();
+      renderShelf();
+    } catch (error) {
+      elements.collectionRenameError.textContent = error.message;
+      elements.collectionRenameError.hidden = false;
+    }
+  });
+
+  elements.collectionDelete.addEventListener('click', () => {
+    elements.collectionDeleteConfirmation.hidden = false;
+    elements.collectionDeleteConfirm.focus({ preventScroll: true });
+  });
+  elements.collectionDeleteCancel.addEventListener('click', () => {
+    elements.collectionDeleteConfirmation.hidden = true;
+    elements.collectionDelete.focus({ preventScroll: true });
+  });
+  elements.collectionDeleteConfirm.addEventListener('click', () => deleteCurrentCollection());
+
+  async function deleteCurrentCollection() {
+    const collectionId = state.shelf.collection?.id;
+    if (!collectionId || shelfReadOnly()) return;
+    elements.collectionDeleteConfirm.disabled = true;
+    elements.collectionError.hidden = true;
+    try {
+      await shelfRequest(`/collections/${collectionId}`, { method: 'DELETE' });
+      state.shelf.collections = state.shelf.collections.filter((collection) => collection.id !== collectionId);
+      state.shelf.memberships = state.shelf.memberships.filter((entry) => entry.collectionId !== collectionId);
+      state.shelf.collection = null;
+      state.shelf.tab = 'collections';
+      openShelf({ historyMode: 'replaceState', transition: 'pop' });
+    } catch (error) {
+      elements.collectionErrorCopy.textContent = error.message;
+      elements.collectionError.hidden = false;
+    } finally {
+      elements.collectionDeleteConfirm.disabled = false;
+    }
+  }
+
+  elements.recipeFavorite.addEventListener('click', () => toggleFavorite(state.recipe.id));
+  elements.recipeCollectionToggle.addEventListener('click', () => openShelfPicker(state.recipe.id, elements.recipeCollectionToggle));
+  elements.shelfPickerBackdrop.addEventListener('click', () => closeShelfPicker());
+  elements.shelfPickerClose.addEventListener('click', () => closeShelfPicker());
+  elements.shelfPickerDone.addEventListener('click', () => closeShelfPicker());
+  elements.shelfPickerList.addEventListener('change', async (event) => {
+    const input = event.target.closest('[data-picker-collection]');
+    if (!input) return;
+    if (state.shelf.demo) {
+      input.checked = !input.checked;
+      elements.shelfPickerError.textContent = 'Staging examples are read-only. Save your own favorites to try this.';
+      elements.shelfPickerError.hidden = false;
+      return;
+    }
+    const collectionId = Number(input.dataset.pickerCollection);
+    input.disabled = true;
+    elements.shelfPickerError.hidden = true;
+    try {
+      await setCollectionMembership(collectionId, state.shelf.pickerRecipeId, input.checked);
+      renderShelfPicker();
+      renderRecipeShelfControls();
+      if (state.screen === 'collection') renderCollection();
+      if (state.screen === 'shelf') renderShelf();
+    } catch (error) {
+      input.checked = !input.checked;
+      elements.shelfPickerError.textContent = error.message;
+      elements.shelfPickerError.hidden = false;
+    } finally {
+      input.disabled = false;
+    }
+  });
+  elements.shelfPickerCreate.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (state.shelf.demo) {
+      elements.shelfPickerError.textContent = 'Staging examples are read-only. Try this with your own account.';
+      elements.shelfPickerError.hidden = false;
+      return;
+    }
+    elements.shelfPickerError.hidden = true;
+    try {
+      const payload = await shelfRequest('/collections', {
+        method: 'POST', body: JSON.stringify({ name: elements.shelfPickerName.value }),
+      });
+      state.shelf.collections = [...state.shelf.collections, payload.collection];
+      await setCollectionMembership(payload.collection.id, state.shelf.pickerRecipeId, true);
+      elements.shelfPickerCreate.reset();
+      renderShelfPicker();
+      renderRecipeShelfControls();
+    } catch (error) {
+      elements.shelfPickerError.textContent = error.message;
+      elements.shelfPickerError.hidden = false;
+    }
+  });
+
   elements.journalButton.addEventListener('click', () => openJournal());
   elements.journalNew.addEventListener('click', () => openJournalForm());
   elements.journalEmptyAction.addEventListener('click', () => {
@@ -1417,6 +2377,7 @@
     const insidePanel = elements.termPanel.contains(trigger);
     openTerm(trigger.dataset.term, insidePanel ? null : trigger);
   });
+
   elements.termPanelClose.addEventListener('click', () => closeTerm());
   elements.termPanelDone.addEventListener('click', () => {
     closeTerm({ restoreFocus: false });
@@ -1427,6 +2388,11 @@
     if (event.key === 'Escape' && state.term.open) {
       event.preventDefault();
       closeTerm();
+      return;
+    }
+    if (event.key === 'Escape' && state.shelf.pickerOpen) {
+      event.preventDefault();
+      closeShelfPicker();
     }
   });
   elements.home.addEventListener('click', () => {
@@ -1441,16 +2407,30 @@
     else if (state.screen === 'journalForm' && state.journal.formMode === 'edit') openJournalDetail(state.journal.entry.id, { historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'journalForm' && state.journal.returnTo === 'brew') navigate('brew', recipeRouteReference(state.recipe), { replace: true, transition: 'pop' });
     else if (state.screen === 'journalForm') openJournal({ historyMode: 'replaceState', transition: 'pop' });
+    else if (state.screen === 'collection') openShelf({ historyMode: 'replaceState', transition: 'pop' });
     else navigate('library', null, { transition: 'pop' });
   });
 
   window.addEventListener('popstate', () => {
     closeTerm({ restoreFocus: false });
+    closeShelfPicker({ restoreFocus: false });
     parseLocation({ focus: true });
   });
   window.addEventListener('pagehide', cancelTimerTick);
 
   populateFilters();
   populateJournalControls();
-  parseLocation();
+  // The shelf backs the favorite hearts on every screen and the library's
+  // favorites and recently-brewed filters, so it loads before the first paint.
+  // A failure is never fatal: hearts render unfavorited and the Shelf screen
+  // shows the error with its own retry.
+  // A staging demo deep link reads its own fake shelf, so it skips the real
+  // preload rather than spending a request the screen will not show.
+  const bootParams = new URLSearchParams(window.location.search);
+  const demoDeepLink = bootParams.get('shelf') === 'demo' || bootParams.get('demo') === '1';
+  if (APP_TOKEN && !demoDeepLink) {
+    ensureShelf().catch(() => {}).finally(() => parseLocation());
+  } else {
+    parseLocation();
+  }
 })();

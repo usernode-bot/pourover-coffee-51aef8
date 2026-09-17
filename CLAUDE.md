@@ -91,5 +91,13 @@ Hario Switch, Mugen, Clever Dripper, and cotton-filter brewing.
 - Preferred doses are non-sensitive device preferences and stay in
   `localStorage`, keyed by recipe id. Read the previous method-level key as a
   migration fallback before using the recipe's base dose.
+- The personal shelf (favorites, collections, collection membership) is
+  account data and lives in PostgreSQL, not on the device. All three tables
+  are `staging:private`. Favorites and collection items reference the stable
+  recipe id, never a revision id, so saving a recipe survives it being
+  revised; resolve the id through `RECIPES` at render time. Shelf writes are
+  optimistic in the UI and roll back on a failed request, so the favorite
+  state is shared by library, method, detail, and collection views instead of
+  being cached per screen.
 - Keep the experience calm and practical. Add one brewing variable at a
   time, and frame every recipe as a starting point rather than a rule.

@@ -12,6 +12,7 @@ const {
   isCurrentRecipeRevision,
 } = require('./public/recipes');
 const journal = require('./journal-store');
+const shelf = require('./shelf-store');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -94,6 +95,21 @@ function entryForClient(entry) {
     }),
   };
 }
+
+// Stable, obviously fake collections for ?demo=1 shelf previews. Recipe ids
+// match the shipped library so every item resolves to a real recipe.
+const DEMO_COLLECTIONS = Object.freeze([
+  Object.freeze({
+    id: 900001,
+    name: 'Staging demo: Weekend pours',
+    recipeIds: Object.freeze(['v60-sweet-pulse', 'switch-hybrid', 'mugen-one-pour']),
+  }),
+  Object.freeze({
+    id: 900002,
+    name: 'Staging demo: Guests',
+    recipeIds: Object.freeze(['clever-water-first', 'cotton-silky']),
+  }),
+]);
 
 function demoJournalEntries() {
   return [
@@ -252,6 +268,240 @@ app.delete('/api/brews/:id', async (req, res) => {
   }
 });
 
+// A small, obviously fake shelf for staging previews, so every shelf screen is
+// reviewable before a tester has saved anything of their own. It is never
+// written to the database and never keyed to the visitor's own account, so it
+// cannot stand in for a real user's favorites.
+function demoMemberships() {
+  const memberships = [];
+  DEMO_COLLECTIONS.forEach((collection, order) => {
+    collection.recipeIds.forEach((recipeId, position) => {
+      memberships.push({
+        collectionId: collection.id,
+        collectionName: collection.name,
+        collectionPosition: order,
+        recipeId,
+        position,
+      });
+    });
+  });
+  return memberships;
+}
+
+function demoFavorites() {
+  return DEMO_COLLECTIONS[0].recipeIds;
+}
+
+function demoCollections() {
+  return DEMO_COLLECTIONS.map((collection, order) => ({
+    id: collection.id,
+    name: collection.name,
+    position: order,
+    itemCount: collection.recipeIds.length,
+    createdAt: '2026-09-14T08:00:00.000Z',
+    updatedAt: '2026-09-15T08:00:00.000Z',
+  }));
+}
+
+function demoRecentlyBrewed() {
+  return demoJournalEntries().map((entry) => ({
+    recipeId: entry.recipeId,
+    lastBrewedAt: entry.brewedAt,
+    brewCount: 1,
+  }));
+}
+
+function sendShelfError(res, error) {
+  if (error instanceof shelf.ShelfValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  console.error(`Recipe shelf request failed: ${error.message}`);
+  return res.status(500).json({ error: 'The recipe shelf could not complete that request.' });
+}
+
+function requireShelf(res) {
+  if (pool) return true;
+  res.status(503).json({ error: 'Recipe shelf storage is unavailable right now.' });
+  return false;
+}
+
+function collectionPayload(model) {
+  return {
+    collection: model.collection,
+    favorites: model.favorites,
+    items: model.items,
+    memberships: model.memberships,
+  };
+}
+
+function isDemoRequest(req) {
+  return IS_STAGING && req.query.demo === '1';
+}
+
+app.get('/api/shelf', async (req, res) => {
+  try {
+    if (isDemoRequest(req)) {
+      return res.json({
+        favorites: demoFavorites(),
+        collections: demoCollections(),
+        memberships: demoMemberships(),
+        recentlyBrewed: demoRecentlyBrewed(),
+        demo: true,
+      });
+    }
+    if (!requireShelf(res)) return undefined;
+    const model = await shelf.loadShelf(pool, shelf.parseUserId(req.user.id));
+    return res.json({ ...model, demo: false });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.get('/api/shelf/collections/:id', async (req, res) => {
+  try {
+    if (isDemoRequest(req)) {
+      const collectionId = Number(req.params.id);
+      const definition = DEMO_COLLECTIONS.find((entry) => entry.id === collectionId);
+      if (!definition) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+      const items = definition.recipeIds.map((recipeId, position) => ({
+        recipeId, position, favorite: demoFavorites().includes(recipeId),
+      }));
+      return res.json({
+        collection: demoCollections().find((entry) => entry.id === collectionId),
+        favorites: demoFavorites(),
+        items,
+        memberships: demoMemberships().filter((entry) => entry.collectionId === collectionId),
+        demo: true,
+      });
+    }
+    if (!requireShelf(res)) return undefined;
+    const collectionId = shelf.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const model = await shelf.loadCollection(pool, shelf.parseUserId(req.user.id), collectionId);
+    return model
+      ? res.json({ ...collectionPayload(model), demo: false })
+      : res.status(404).json({ error: 'That collection is not on your shelf.' });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.put('/api/shelf/favorites/:recipeId', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const recipeId = String(req.params.recipeId || '').trim();
+    if (!RECIPES.some((recipe) => recipe.id === recipeId)) {
+      return res.status(400).json({ error: 'That recipe is not in the library.' });
+    }
+    if (req.body && req.body.favorite === false) {
+      await shelf.removeFavorite(pool, shelf.parseUserId(req.user.id), recipeId);
+      return res.json({ recipeId, favorite: false });
+    }
+    await shelf.addFavorite(pool, shelf.parseUserId(req.user.id), recipeId);
+    return res.json({ recipeId, favorite: true });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.post('/api/shelf/collections', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collection = await shelf.createCollection(pool, shelf.parseUserId(req.user.id), req.body?.name);
+    return res.status(201).json({ collection });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.patch('/api/shelf/collections/:id', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = shelf.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const collection = await shelf.renameCollection(pool, shelf.parseUserId(req.user.id), collectionId, req.body?.name);
+    return collection
+      ? res.json({ collection })
+      : res.status(404).json({ error: 'That collection is not on your shelf.' });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.delete('/api/shelf/collections/:id', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = shelf.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const deleted = await shelf.deleteCollection(pool, shelf.parseUserId(req.user.id), collectionId);
+    if (!deleted) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const model = await shelf.loadShelf(pool, shelf.parseUserId(req.user.id));
+    return res.json({ deleted: true, ...model });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.put('/api/shelf/collections/order', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collections = await shelf.reorderCollections(pool, shelf.parseUserId(req.user.id), req.body?.collectionIds);
+    return res.json({ collections });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.put('/api/shelf/collections/:id/items/:recipeId', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = shelf.parseCollectionId(req.params.id);
+    const recipeId = String(req.params.recipeId || '').trim();
+    if (!collectionId) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    if (!RECIPES.some((recipe) => recipe.id === recipeId)) {
+      return res.status(400).json({ error: 'That recipe is not in the library.' });
+    }
+    const userId = shelf.parseUserId(req.user.id);
+    const collection = await shelf.getCollection(pool, userId, collectionId);
+    if (!collection) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const items = await shelf.addCollectionItem(pool, userId, collectionId, recipeId);
+    return res.json({ collectionId, items, memberships: items.map((item) => ({
+      collectionId, collectionName: collection.name, recipeId: item.recipeId, position: item.position,
+    })) });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.delete('/api/shelf/collections/:id/items/:recipeId', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = shelf.parseCollectionId(req.params.id);
+    const recipeId = String(req.params.recipeId || '').trim();
+    if (!collectionId) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const removed = await shelf.removeCollectionItem(pool, shelf.parseUserId(req.user.id), collectionId, recipeId);
+    return removed
+      ? res.status(204).end()
+      : res.status(404).json({ error: 'That recipe is not in this collection.' });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
+app.put('/api/shelf/collections/:id/order', async (req, res) => {
+  try {
+    if (!requireShelf(res)) return undefined;
+    const collectionId = shelf.parseCollectionId(req.params.id);
+    if (!collectionId) return res.status(404).json({ error: 'That collection is not on your shelf.' });
+    const items = await shelf.reorderCollectionItems(
+      pool, shelf.parseUserId(req.user.id), collectionId, req.body?.recipeIds
+    );
+    return res.json({ collectionId, items });
+  } catch (error) {
+    return sendShelfError(res, error);
+  }
+});
+
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
@@ -304,8 +554,9 @@ async function shutdown(signal) {
 async function boot() {
   try {
     await journal.initializeJournal(pool);
+    await shelf.initializeShelf(pool);
   } catch (error) {
-    console.error(`Brew journal schema failed: ${error.message}`);
+    console.error(`App schema failed: ${error.message}`);
     process.exit(1);
     return;
   }
