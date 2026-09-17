@@ -35,6 +35,14 @@
     searchGlossary,
   } = window.PouroverGlossary;
 
+  const {
+    SYMPTOMS: ADJUSTMENT_SYMPTOMS,
+    applyRecommendation,
+    recipeFromSnapshot,
+    recommendAdjustment,
+    selectedSymptoms,
+  } = window.PouroverAdjustments;
+
   const screens = {
     library: document.getElementById('library-screen'),
     method: document.getElementById('method-screen'),
@@ -153,6 +161,18 @@
     journalSetupDetails: document.getElementById('journal-setup-details'),
     journalDetailNotes: document.getElementById('journal-detail-notes'),
     journalDetailChange: document.getElementById('journal-detail-change'),
+    journalAdjustmentSymptoms: document.getElementById('journal-adjustment-symptoms'),
+    journalAdjustmentGenerate: document.getElementById('journal-adjustment-generate'),
+    journalAdjustmentStatus: document.getElementById('journal-adjustment-status'),
+    journalAdjustmentResult: document.getElementById('journal-adjustment-result'),
+    journalAdjustmentContext: document.getElementById('journal-adjustment-context'),
+    journalAdjustmentTitle: document.getElementById('journal-adjustment-title'),
+    journalAdjustmentChange: document.getElementById('journal-adjustment-change'),
+    journalAdjustmentWhy: document.getElementById('journal-adjustment-why'),
+    journalAdjustmentKeep: document.getElementById('journal-adjustment-keep'),
+    journalAdjustmentSave: document.getElementById('journal-adjustment-save'),
+    journalAdjustmentRecipe: document.getElementById('journal-adjustment-recipe'),
+    journalAdjustmentDemoNote: document.getElementById('journal-adjustment-demo-note'),
     journalDetailActions: document.getElementById('journal-detail-actions'),
     journalRepeat: document.getElementById('journal-repeat'),
     journalEdit: document.getElementById('journal-edit'),
@@ -312,6 +332,8 @@
       formMode: 'create',
       formSource: 'manual',
       returnTo: 'journal',
+      adjustmentSymptoms: [],
+      recommendation: null,
     },
     shelf: {
       demo: false,
@@ -893,7 +915,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'adjust', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
       .forEach((key) => url.searchParams.delete(key));
   }
 
@@ -933,6 +955,9 @@
     if (screen === 'journalDetail') {
       url.searchParams.set('journal', state.journal.demo ? 'demo' : '1');
       url.searchParams.set('entry', id);
+      if (state.journal.adjustmentSymptoms.length) {
+        url.searchParams.set('adjust', state.journal.adjustmentSymptoms.join(','));
+      }
     }
     if (screen === 'journalForm') {
       if (state.journal.formMode === 'edit') {
@@ -1037,7 +1062,11 @@
     }
     if (journalEntryId && (journalMode === '1' || journalMode === 'demo')) {
       openJournalDetail(journalEntryId, {
-        demo: journalMode === 'demo', historyMode: null, focus, transition: 'none',
+        demo: journalMode === 'demo',
+        adjustmentSymptoms: selectedSymptoms(params.get('adjust')).map((symptom) => symptom.id),
+        historyMode: null,
+        focus,
+        transition: 'none',
       });
       return;
     }
@@ -1428,13 +1457,15 @@
     updatePersonalRecipeWaterTotal();
   }
 
-  function openPersonalRecipeForm({ recipe = null, source = null, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+  function openPersonalRecipeForm({ recipe = null, source = null, parentRecipeRef, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
     const editing = Boolean(recipe?.isPersonal);
     const base = cloneRecipeForForm(recipe || source || scratchRecipe());
     if (!editing && source) base.title = `${source.title}, my version`.slice(0, 100);
     state.personal.formMode = editing ? 'edit' : 'create';
     state.personal.formRecipeId = editing ? recipe.id : null;
-    state.personal.parentRecipeRef = !editing && source ? source.revisionId : null;
+    state.personal.parentRecipeRef = !editing && source
+      ? (parentRecipeRef === undefined ? source.revisionId : parentRecipeRef)
+      : null;
     state.personal.returnTo = source || editing ? 'recipe' : 'myRecipes';
     elements.personalRecipeForm.reset();
     fillPersonalRecipeForm(base);
@@ -1444,11 +1475,13 @@
       ? 'Saving creates a new revision. Past brews keep the exact recipe they used.'
       : 'Set the dose, ratio, instructions, and cues you want beside you during a brew.';
     const lineage = editing ? recipe.parentRecipe : source ? {
-      title: source.title, revisionId: source.revisionId, attribution: source.attribution.label,
+      title: source.title,
+      revisionId: state.personal.parentRecipeRef,
+      attribution: state.personal.parentRecipeRef ? source.attribution.label : 'Saved brew snapshot',
     } : null;
     elements.recipeFormSource.hidden = !lineage;
     elements.recipeFormSource.textContent = lineage
-      ? `Based on ${lineage.title} · ${lineage.revisionId} · ${lineage.attribution}`
+      ? `Based on ${lineage.title}${lineage.revisionId ? ` · ${lineage.revisionId}` : ''} · ${lineage.attribution}`
       : '';
     elements.personalRecipeFormError.hidden = true;
     elements.personalRecipeFormSave.textContent = editing ? 'Save new revision' : 'Save private recipe';
@@ -2036,6 +2069,116 @@
     }).join('');
   }
 
+  function resetJournalAdjustment(symptoms = []) {
+    state.journal.adjustmentSymptoms = selectedSymptoms(symptoms).map((symptom) => symptom.id);
+    state.journal.recommendation = null;
+    elements.journalAdjustmentStatus.textContent = '';
+    elements.journalAdjustmentResult.hidden = true;
+  }
+
+  function renderJournalAdjustmentSymptoms() {
+    const selected = new Set(state.journal.adjustmentSymptoms);
+    elements.journalAdjustmentSymptoms.innerHTML = ADJUSTMENT_SYMPTOMS.map((symptom) => `
+      <button type="button" data-adjustment-symptom="${symptom.id}" aria-pressed="${selected.has(symptom.id)}">${symptom.label}</button>
+    `).join('');
+  }
+
+  function renderJournalAdjustmentResult(recommendation) {
+    state.journal.recommendation = recommendation;
+    if (!recommendation.ok) {
+      elements.journalAdjustmentResult.hidden = true;
+      elements.journalAdjustmentStatus.textContent = recommendation.message;
+      return;
+    }
+    elements.journalAdjustmentContext.textContent = recommendation.context;
+    elements.journalAdjustmentTitle.textContent = recommendation.title;
+    elements.journalAdjustmentChange.textContent = recommendation.change;
+    elements.journalAdjustmentWhy.textContent = recommendation.why;
+    elements.journalAdjustmentKeep.textContent = recommendation.keep;
+    elements.journalAdjustmentSave.disabled = state.journal.demo;
+    elements.journalAdjustmentRecipe.disabled = state.journal.demo;
+    elements.journalAdjustmentDemoNote.hidden = !state.journal.demo;
+    elements.journalAdjustmentResult.hidden = false;
+    elements.journalAdjustmentStatus.textContent = `Recommendation ready for ${recommendation.symptomLabels.join(' and ').toLowerCase()}.`;
+  }
+
+  function generateJournalAdjustment({ focus = false } = {}) {
+    const entry = state.journal.entry;
+    const recommendation = recommendAdjustment({
+      symptoms: state.journal.adjustmentSymptoms,
+      recipeSnapshot: entry?.recipeSnapshot,
+      grinder: entry?.grinder,
+      grindSetting: entry?.grindSetting,
+      ratings: entry,
+    });
+    renderJournalAdjustmentResult(recommendation);
+    if (focus && recommendation.ok) elements.journalAdjustmentResult.focus({ preventScroll: true });
+    return recommendation;
+  }
+
+  function updateJournalAdjustmentUrl() {
+    if (state.screen !== 'journalDetail' || !state.journal.entry) return;
+    history.replaceState(
+      { screen: 'journalDetail', id: state.journal.entry.id },
+      '',
+      urlFor('journalDetail', state.journal.entry.id)
+    );
+  }
+
+  async function saveJournalAdjustment() {
+    const recommendation = state.journal.recommendation;
+    if (!recommendation?.ok || state.journal.demo) return;
+    elements.journalAdjustmentSave.disabled = true;
+    elements.journalAdjustmentStatus.textContent = 'Saving the next experiment…';
+    try {
+      const previous = state.journal.entry;
+      const payload = await apiFetch(`/api/brews/${encodeURIComponent(previous.id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ changeNextTime: recommendation.change }),
+      });
+      state.journal.entry = {
+        ...previous,
+        ...payload.entry,
+        currentRecipeVersion: previous.currentRecipeVersion,
+        isCurrentRecipeRevision: previous.isCurrentRecipeRevision,
+        recipeRevisionAvailable: previous.recipeRevisionAvailable,
+      };
+      elements.journalDetailChange.textContent = state.journal.entry.changeNextTime;
+      elements.journalAdjustmentStatus.textContent = 'Saved as the change for next time.';
+      if (window.unNative?.toast) window.unNative.toast('Next experiment saved');
+    } catch (error) {
+      elements.journalAdjustmentStatus.textContent = error.message;
+    } finally {
+      elements.journalAdjustmentSave.disabled = false;
+    }
+  }
+
+  async function makeJournalFollowUpRecipe() {
+    const entry = state.journal.entry;
+    const recommendation = state.journal.recommendation;
+    if (!entry || !recommendation?.ok || state.journal.demo) return;
+    elements.journalAdjustmentRecipe.disabled = true;
+    elements.journalAdjustmentStatus.textContent = 'Preparing the follow-up recipe…';
+    try {
+      let source = findRecipe(entry.recipeRevisionId);
+      if (!source && entry.recipeId.startsWith('personal-') && entry.recipeRevisionAvailable) {
+        await loadPersonalRevision(entry.recipeRevisionId);
+        source = findRecipe(entry.recipeRevisionId);
+      }
+      const parentRecipeRef = source?.revisionId || null;
+      const base = source || recipeFromSnapshot(entry.recipeSnapshot);
+      const adjusted = applyRecommendation(base, recommendation, {
+        grinder: entry.grinder,
+        grindSetting: entry.grindSetting,
+      });
+      if (!adjusted) throw new Error('This snapshot cannot be turned into a follow-up recipe.');
+      openPersonalRecipeForm({ source: adjusted, parentRecipeRef });
+    } catch (error) {
+      elements.journalAdjustmentStatus.textContent = error.message;
+      elements.journalAdjustmentRecipe.disabled = false;
+    }
+  }
+
   function renderJournalDetail() {
     const entry = state.journal.entry;
     const snapshot = entry.recipeSnapshot;
@@ -2067,6 +2210,12 @@
     renderTasteScores(entry);
     elements.journalDetailNotes.textContent = entry.notes || 'No tasting notes recorded.';
     elements.journalDetailChange.textContent = entry.changeNextTime || 'No change planned yet.';
+    renderJournalAdjustmentSymptoms();
+    if (state.journal.adjustmentSymptoms.length) generateJournalAdjustment();
+    else {
+      elements.journalAdjustmentStatus.textContent = '';
+      elements.journalAdjustmentResult.hidden = true;
+    }
     elements.journalDetailActions.classList.toggle('sm:grid-cols-3', !state.journal.demo);
     elements.journalDetailActions.classList.toggle('sm:grid-cols-1', state.journal.demo);
     elements.journalEdit.hidden = state.journal.demo;
@@ -2086,8 +2235,9 @@
     return payload.entry;
   }
 
-  async function openJournalDetail(id, { demo = false, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+  async function openJournalDetail(id, { demo = false, adjustmentSymptoms = [], historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
     state.journal.demo = demo;
+    resetJournalAdjustment(adjustmentSymptoms);
     elements.journalDetailMethod.textContent = 'Brew journal';
     elements.journalDetailTitle.textContent = 'Loading brew…';
     elements.journalDetailDate.textContent = '';
@@ -2615,6 +2765,27 @@
     history.replaceState({ screen: 'journal' }, '', urlFor('journal'));
     loadJournal();
   });
+  elements.journalAdjustmentSymptoms.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-adjustment-symptom]');
+    if (!button) return;
+    const symptom = button.dataset.adjustmentSymptom;
+    const selected = new Set(state.journal.adjustmentSymptoms);
+    if (selected.has(symptom)) selected.delete(symptom);
+    else selected.add(symptom);
+    state.journal.adjustmentSymptoms = ADJUSTMENT_SYMPTOMS
+      .map((candidate) => candidate.id)
+      .filter((id) => selected.has(id));
+    state.journal.recommendation = null;
+    elements.journalAdjustmentResult.hidden = true;
+    elements.journalAdjustmentStatus.textContent = state.journal.adjustmentSymptoms.length
+      ? `${state.journal.adjustmentSymptoms.length} ${state.journal.adjustmentSymptoms.length === 1 ? 'symptom' : 'symptoms'} selected.`
+      : 'Choose at least one symptom from the cup.';
+    button.setAttribute('aria-pressed', String(selected.has(symptom)));
+    updateJournalAdjustmentUrl();
+  });
+  elements.journalAdjustmentGenerate.addEventListener('click', () => generateJournalAdjustment({ focus: true }));
+  elements.journalAdjustmentSave.addEventListener('click', saveJournalAdjustment);
+  elements.journalAdjustmentRecipe.addEventListener('click', makeJournalFollowUpRecipe);
   elements.journalRepeat.addEventListener('click', repeatJournalEntry);
   elements.journalEdit.addEventListener('click', () => openJournalEdit(state.journal.entry.id));
   elements.journalDelete.addEventListener('click', () => {

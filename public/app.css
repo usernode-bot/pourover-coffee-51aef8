@@ -1534,6 +1534,82 @@ textarea:focus-visible,
   white-space: pre-wrap;
 }
 
+.adjustment-card {
+  border: 1px solid rgba(82, 110, 86, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(129, 157, 126, 0.15), transparent 40%),
+    linear-gradient(145deg, rgba(255, 252, 247, 0.98), rgba(230, 238, 226, 0.92));
+  box-shadow: 0 18px 40px rgba(65, 76, 55, 0.08);
+}
+
+.adjustment-symptoms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.adjustment-symptoms button {
+  min-height: 2.6rem;
+  border: 1px solid #c9d5c4;
+  border-radius: 999px;
+  padding: 0.55rem 0.9rem;
+  background: rgba(255, 252, 247, 0.84);
+  color: #52634f;
+  font-size: 0.78rem;
+  font-weight: 760;
+  transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.adjustment-symptoms button[aria-pressed="true"] {
+  border-color: #657d64;
+  background: #657d64;
+  color: #fffdf9;
+  box-shadow: 0 7px 16px rgba(59, 83, 61, 0.18);
+}
+
+@media (hover: hover) {
+  .adjustment-symptoms button:hover {
+    transform: translateY(-1px);
+  }
+}
+
+.adjustment-result {
+  border: 1px solid rgba(101, 125, 100, 0.26);
+  border-radius: 1.25rem;
+  padding: 1rem;
+  background: rgba(255, 253, 249, 0.76);
+}
+
+.adjustment-result:focus-visible {
+  outline: 3px solid rgba(101, 125, 100, 0.35);
+  outline-offset: 3px;
+}
+
+.adjustment-explanation {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.adjustment-explanation > div {
+  border-left: 3px solid #a9bca5;
+  padding-left: 0.8rem;
+}
+
+.adjustment-explanation dt {
+  color: #64735f;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.adjustment-explanation dd {
+  margin-top: 0.25rem;
+  color: #56473d;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
 .journal-error,
 .journal-form-error,
 .delete-confirmation {
