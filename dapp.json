@@ -1,8 +1,6 @@
 {
   "name": "Pourover Coffee",
-  "icon": {
-    "emoji": "\u2615"
-  },
+  "icon": { "image": "brand/icon.png", "emoji": "☕" },
   "secrets": [],
   "tests": [
     {
