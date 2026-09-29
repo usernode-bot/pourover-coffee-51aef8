@@ -100,11 +100,16 @@
         <span id="offline-status-label">Offline</span>
         <button id="offline-status-details" class="offline-status-details" type="button">Details</button>
       </span>
-          <button id="my-recipes-button" class="text-button un-touch-target" type="button">My recipes</button>
-          <button id="shelf-button" class="text-button un-touch-target" type="button">My shelf</button>
-          <button id="journal-button" class="text-button un-touch-target" type="button">Journal</button>
-          <button id="glossary-button" class="text-button un-touch-target" type="button">Glossary</button>
-          <button id="about-button" class="text-button un-touch-target" type="button">About</button>
+          <button id="menu-toggle" class="icon-button un-touch-target header-menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="header-nav" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <nav id="header-nav" class="header-nav" aria-label="Main" hidden>
+            <button id="my-recipes-button" class="text-button un-touch-target" type="button">My recipes</button>
+            <button id="shelf-button" class="text-button un-touch-target" type="button">My shelf</button>
+            <button id="journal-button" class="text-button un-touch-target" type="button">Journal</button>
+            <button id="glossary-button" class="text-button un-touch-target" type="button">Glossary</button>
+            <button id="about-button" class="text-button un-touch-target" type="button">About</button>
+          </nav>
         </div>
       </div>
     </header>

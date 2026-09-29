@@ -72,6 +72,8 @@
   const elements = {
     back: document.getElementById('back-button'),
     home: document.getElementById('home-button'),
+    menuToggle: document.getElementById('menu-toggle'),
+    headerNav: document.getElementById('header-nav'),
     myRecipesButton: document.getElementById('my-recipes-button'),
     offlineStatus: document.getElementById('offline-status'),
     offlineStatusLabel: document.getElementById('offline-status-label'),
@@ -356,6 +358,7 @@
     lastActiveStepLabel: null,
     lastNextStepLabel: null,
     lastRenderedStep: null,
+    headerMenuOpen: false,
     timer: freshTimer(),
     timerHandle: null,
     lastAnnouncedStep: -1,
@@ -3173,6 +3176,11 @@
   });
   elements.termPanelBackdrop.addEventListener('click', () => closeTerm());
   document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.headerMenuOpen) {
+      event.preventDefault();
+      closeHeaderMenu();
+      return;
+    }
     if (event.key === 'Escape' && !elements.collectionPicker.hidden) {
       event.preventDefault();
       closeCollectionPicker();
@@ -3228,6 +3236,60 @@
     event.returnValue = '';
   });
   window.addEventListener('pagehide', cancelTimerTick);
+
+  // Mobile header menu: the nav itself becomes the dropdown panel below
+  // 640px, anchored under the sticky header. Inline on desktop.
+  function openHeaderMenu() {
+    state.headerMenuOpen = true;
+    elements.headerNav.hidden = false;
+    elements.headerNav.classList.add('open');
+    elements.menuToggle.setAttribute('aria-expanded', 'true');
+    elements.menuToggle.setAttribute('aria-label', 'Close menu');
+  }
+
+  function closeHeaderMenu() {
+    state.headerMenuOpen = false;
+    elements.headerNav.hidden = true;
+    elements.headerNav.classList.remove('open');
+    elements.menuToggle.setAttribute('aria-expanded', 'false');
+    elements.menuToggle.setAttribute('aria-label', 'Open menu');
+  }
+
+  elements.menuToggle.addEventListener('click', () => {
+    if (state.headerMenuOpen) closeHeaderMenu();
+    else openHeaderMenu();
+  });
+  const headerMenuQuery = window.matchMedia('(min-width: 640px)');
+  function syncHeaderMenuLayout() {
+    if (headerMenuQuery.matches) {
+      state.headerMenuOpen = false;
+      elements.headerNav.hidden = false;
+      elements.headerNav.classList.remove('open');
+      elements.menuToggle.setAttribute('aria-expanded', 'false');
+      elements.menuToggle.setAttribute('aria-label', 'Open menu');
+      elements.menuToggle.hidden = true;
+    } else {
+      elements.headerNav.hidden = !state.headerMenuOpen;
+      elements.headerNav.classList.toggle('open', state.headerMenuOpen);
+      elements.menuToggle.hidden = false;
+    }
+  }
+  syncHeaderMenuLayout();
+  if (typeof headerMenuQuery.addEventListener === 'function') {
+    headerMenuQuery.addEventListener('change', syncHeaderMenuLayout);
+  } else {
+    headerMenuQuery.addListener(syncHeaderMenuLayout);
+  }
+  elements.headerNav.addEventListener('click', (event) => {
+    if (!event.target.closest('button')) return;
+    if (!state.headerMenuOpen) return;
+    closeHeaderMenu();
+  });
+  document.addEventListener('click', (event) => {
+    if (!state.headerMenuOpen) return;
+    if (elements.menuToggle.contains(event.target) || elements.headerNav.contains(event.target)) return;
+    closeHeaderMenu();
+  });
 
 
   // -------------------------------------------------------------------------
