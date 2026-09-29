@@ -43,6 +43,7 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?recipe=v60-bright&shot=picker&demo=1',
     '/?glossary=1',
     '/?glossary=1&q=drawdown',
+    '/?glossary=1&q=water',
     '/?glossary=1&term=bloom',
     '/?method=aeropress',
     '/?recipe=aeropress-inverted',
@@ -73,22 +74,23 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.equal(manifest.tests[10].expectText, 'Try one small grind step finer');
   assert.equal(manifest.tests[11].expectText, 'What did you use?');
   assert.ok(manifest.tests.slice(8, 12).every((entry) => entry.visual));
-  assert.equal(manifest.tests[20].visual, true);
-  assert.equal(manifest.tests[20].id, 'glossary.term-panel');
-  assert.match(manifest.tests[20].expectText, /gas escape/);
-  assert.equal(manifest.tests[21].expectText, '3 recipes for AeroPress');
-  assert.equal(manifest.tests[22].id, 'manual.aeropress-recipe');
-  assert.equal(manifest.tests[23].id, 'manual.aeropress-timer');
-  assert.ok(manifest.tests.slice(22, 24).every((entry) => entry.visual));
-  assert.deepEqual(manifest.tests.slice(24, 28).map((entry) => entry.id), [
+  assert.equal(manifest.tests[20].path, '/?glossary=1&q=water');
+  assert.equal(manifest.tests[21].visual, true);
+  assert.equal(manifest.tests[21].id, 'glossary.term-panel');
+  assert.match(manifest.tests[21].expectText, /gas escape/);
+  assert.equal(manifest.tests[22].expectText, '3 recipes for AeroPress');
+  assert.equal(manifest.tests[23].id, 'manual.aeropress-recipe');
+  assert.equal(manifest.tests[24].id, 'manual.aeropress-timer');
+  assert.ok(manifest.tests.slice(23, 25).every((entry) => entry.visual));
+  assert.deepEqual(manifest.tests.slice(25, 29).map((entry) => entry.id), [
     'personal-recipes.library',
     'personal-recipes.lineage',
     'personal-recipes.editor',
     'personal-recipes.timer',
   ]);
-  assert.ok(manifest.tests.slice(24, 28).every((entry) => entry.visual));
-  assert.equal(manifest.tests[28].id, 'offline.sync-status');
-  assert.equal(manifest.tests[28].expectText, 'Sync status');
+  assert.ok(manifest.tests.slice(25, 29).every((entry) => entry.visual));
+  assert.equal(manifest.tests[29].id, 'offline.sync-status');
+  assert.equal(manifest.tests[29].expectText, 'Sync status');
 });
 
 test('private recipe screens expose creation, lineage, revision, and lifecycle controls', () => {

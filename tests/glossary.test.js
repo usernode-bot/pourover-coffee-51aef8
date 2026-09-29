@@ -140,3 +140,24 @@ test('every glossary string is free of em dash encodings', () => {
     }
   }
 });
+
+test('the water guide groups its terms and links them together', () => {
+  const waterTermIds = ['water-quality', 'filtered-water'];
+  for (const id of waterTermIds) {
+    assert.ok(getGlossaryTerm(id), `missing term: ${id}`);
+  }
+  const matches = searchGlossary('water');
+  for (const id of waterTermIds) {
+    assert.ok(matches.some((term) => term.id === id), `search 'water' misses ${id}`);
+  }
+  const basics = glossaryTermsByCategory().find((group) => group.category === 'Recipe basics');
+  for (const id of waterTermIds) {
+    assert.ok(basics.terms.some((term) => term.id === id), `${id} is not in Recipe basics`);
+  }
+  for (const id of waterTermIds) {
+    const term = getGlossaryTerm(id);
+    for (const related of term.seeAlso) {
+      assert.ok(getGlossaryTerm(related), `${id} links to unknown term ${related}`);
+    }
+  }
+});

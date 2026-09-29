@@ -312,6 +312,7 @@
     collectionPickerError: document.getElementById('collection-picker-error'),
     collectionPickerClose: document.getElementById('collection-picker-close'),
     collectionPickerDone: document.getElementById('collection-picker-done'),
+    waterGlossaryButton: document.getElementById('water-glossary-button'),
     glossary: document.getElementById('glossary-button'),
     glossarySearch: document.getElementById('glossary-search'),
     glossaryList: document.getElementById('glossary-list'),
@@ -3145,6 +3146,10 @@
   });
   elements.about.addEventListener('click', openAbout);
   elements.glossary.addEventListener('click', openGlossary);
+  elements.waterGlossaryButton.addEventListener('click', () => {
+    state.glossaryQuery = 'water';
+    openGlossary();
+  });
   elements.glossarySearch.addEventListener('input', () => {
     state.glossaryQuery = elements.glossarySearch.value;
     renderGlossary();

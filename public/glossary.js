@@ -61,6 +61,22 @@
       detail: 'Targets are cumulative and always climb. A step that says 250g means the scale should read 250g when the step ends, even if you only added 100g during it.',
       seeAlso: ['total-water', 'pour'],
     },
+    {
+      id: 'water-quality',
+      term: 'Water quality',
+      category: 'Recipe basics',
+      summary: 'What is dissolved in your brewing water besides the coffee itself.',
+      detail: 'Water carries dissolved minerals, and those minerals shape the cup. Harder water with more calcium and magnesium tends to pull more out of the grounds, which can deepen flavor but also add dryness. Softer water extracts more gently and can taste cleaner but flat if it goes too far. Distilled water has almost no minerals, so coffee brewed with it alone often tastes hollow.',
+      seeAlso: ['water-temperature', 'total-water', 'filtered-water'],
+    },
+    {
+      id: 'filtered-water',
+      term: 'Filtered water',
+      category: 'Recipe basics',
+      summary: 'Doing something about the tap water you already have.',
+      detail: 'A basic carbon filter pitcher is the easy first step: it removes chlorine and off tastes while leaving most helpful minerals in place. If the cup still tastes dull or dry, try a bottled water with a neutral mineral profile or a remineralized water. Distilled water is not a fix by itself; it needs minerals added back before it brews well.',
+      seeAlso: ['water-quality', 'water-temperature', 'clarity'],
+    },
 
     // Technique
     {

@@ -196,6 +196,11 @@
       "expectText": "Drawdown"
     },
     {
+      "name": "Water guide search shows water terms",
+      "path": "/?glossary=1&q=water",
+      "expectText": "Water quality"
+    },
+    {
       "id": "glossary.term-panel",
       "name": "A term opens a definition panel",
       "path": "/?glossary=1&term=bloom",
