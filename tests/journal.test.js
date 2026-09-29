@@ -71,6 +71,35 @@ test('journal schema is idempotent, indexed per user, and explicitly private', a
   assert.match(schema, /COMMENT ON TABLE brew_journal_entries IS 'staging:private'/);
   assert.match(schema, /CREATE INDEX IF NOT EXISTS brew_journal_entries_user_brewed_idx/);
   assert.match(schema, /user_id, brewed_at DESC/);
+  assert.match(schema, /ADD COLUMN IF NOT EXISTS coffee_id BIGINT/);
+  assert.match(schema, /ADD COLUMN IF NOT EXISTS coffee_snapshot JSONB/);
+  assert.match(schema, /CREATE INDEX IF NOT EXISTS brew_journal_entries_user_coffee_idx/);
+  assert.match(schema, /user_id, coffee_id, brewed_at DESC/);
+});
+
+test('journal create input accepts an optional saved coffee id', () => {
+  const withCoffee = journal.normalizeCreateInput({
+    recipeId: 'v60-sweet-pulse', recipeVersion: 1, coffee: 21, coffeeId: '12',
+  });
+  assert.equal(withCoffee.coffeeId, 12);
+  const withoutCoffee = journal.normalizeCreateInput({
+    recipeId: 'v60-sweet-pulse', recipeVersion: 1, coffee: 21,
+  });
+  assert.equal(withoutCoffee.coffeeId, null);
+  assert.equal(journal.normalizeCreateInput({
+    recipeId: 'v60-sweet-pulse', recipeVersion: 1, coffee: 21, coffeeId: null,
+  }).coffeeId, null);
+  assert.throws(
+    () => journal.normalizeCreateInput({ recipeId: 'v60-sweet-pulse', recipeVersion: 1, coffee: 21, coffeeId: -1 }),
+    /valid saved coffee/
+  );
+});
+
+test('journal update input ignores the coffee linkage entirely', () => {
+  const input = journal.normalizeUpdateInput({ notes: 'Clearer when cool.', coffeeId: 99 });
+  assert.equal(input.notes, 'Clearer when cool.');
+  assert.equal(input.coffeeId, undefined);
+  assert.ok(!('coffeeId' in input));
 });
 
 test('journal reads, edits, and deletes are always scoped to the authenticated user', async () => {
@@ -84,18 +113,73 @@ test('journal reads, edits, and deletes are always scoped to the authenticated u
   };
 
   await journal.listEntries(pool, 7, { methodId: 'v60', recipeId: 'v60-sweet-pulse', q: 'honey' });
+  await journal.listEntries(pool, 7, { coffeeId: 12 });
+  assert.match(calls[1].sql, /coffee_id = \$2/);
+  assert.deepEqual(calls[1].values, [7, 12]);
   await journal.getEntry(pool, 7, 42);
   await journal.updateEntry(pool, 7, 42, { notes: 'Clearer when cool.' });
   await journal.deleteEntry(pool, 7, 42);
 
   assert.match(calls[0].sql, /WHERE user_id = \$1/);
   assert.deepEqual(calls[0].values, [7, 'v60', 'v60-sweet-pulse', '%honey%']);
-  assert.match(calls[1].sql, /id = \$1 AND user_id = \$2/);
-  assert.deepEqual(calls[1].values, [42, 7]);
-  assert.match(calls[2].sql, /WHERE id = \$1 AND user_id = \$2/);
-  assert.deepEqual(calls[2].values.slice(0, 2), [42, 7]);
+  assert.match(calls[2].sql, /id = \$1 AND user_id = \$2/);
+  assert.deepEqual(calls[2].values, [42, 7]);
   assert.match(calls[3].sql, /WHERE id = \$1 AND user_id = \$2/);
-  assert.deepEqual(calls[3].values, [42, 7]);
+  assert.deepEqual(calls[3].values.slice(0, 2), [42, 7]);
+  assert.match(calls[4].sql, /WHERE id = \$1 AND user_id = \$2/);
+  assert.deepEqual(calls[4].values, [42, 7]);
+});
+
+test('creating a journal entry stores the coffee id and snapshot when a saved coffee is chosen', async () => {
+  let insert;
+  const snapshot = createRecipeSnapshot('v60-sweet-pulse@1', 21);
+  const pool = {
+    query: async (sql, values) => {
+      insert = { sql, values };
+      return { rows: [databaseRow({ recipe_snapshot: snapshot })] };
+    },
+  };
+  const input = journal.normalizeCreateInput({
+    recipeId: snapshot.id, recipeVersion: snapshot.version, coffee: 21, coffeeId: 12,
+  });
+  await journal.createEntry(pool, { id: 7, username: 'brewer' }, input, snapshot, {
+    id: 12, name: 'Finca El Jardín', roaster: 'Example Roaster',
+  });
+  assert.match(insert.sql, /coffee_id, coffee_snapshot/);
+  assert.equal(insert.values[23], 12);
+  assert.deepEqual(JSON.parse(insert.values[24]).name, 'Finca El Jardín');
+});
+
+test('creating a journal entry without a saved coffee leaves both coffee columns out', async () => {
+  let insert;
+  const snapshot = createRecipeSnapshot('v60-sweet-pulse@1', 21);
+  const pool = {
+    query: async (sql, values) => {
+      insert = { sql, values };
+      return { rows: [databaseRow({ recipe_snapshot: snapshot })] };
+    },
+  };
+  const input = journal.normalizeCreateInput({ recipeId: snapshot.id, recipeVersion: snapshot.version, coffee: 21 });
+  await journal.createEntry(pool, { id: 7, username: 'brewer' }, input, snapshot);
+  assert.ok(!/coffee_id/.test(insert.sql));
+  assert.equal(insert.values.length, 23);
+});
+
+test('updating a journal entry never includes the coffee columns in its assignments', async () => {
+  let sql;
+  const pool = {
+    query: async (statement) => {
+      sql = statement;
+      return { rows: [databaseRow()] };
+    },
+  };
+  await journal.updateEntry(pool, 7, 42, {
+    notes: 'Clearer when cool.', coffeeName: 'Different bag', coffeeId: 99,
+  });
+  assert.ok(!/coffee_id/.test(sql));
+  assert.match(sql, /notes = \$/);
+  // The free-text coffee name stays editable; the immutable linkage does not.
+  assert.match(sql, /coffee_name = \$/);
 });
 
 test('creating a journal entry stores the immutable recipe identity and snapshot JSON', async () => {

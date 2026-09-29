@@ -1,6 +1,9 @@
 {
   "name": "Pourover Coffee",
-  "icon": { "image": "brand/icon.png", "emoji": "☕" },
+  "icon": {
+    "image": "brand/icon.png",
+    "emoji": "☕"
+  },
   "secrets": [],
   "tests": [
     {
@@ -79,7 +82,7 @@
       "id": "journal.history",
       "name": "Brew journal renders private history",
       "path": "/?journal=demo",
-      "expectText": "Staging demo: Finca El Jard\u00edn",
+      "expectText": "Staging demo: Finca El Jardín",
       "visual": true,
       "impact": [
         "public/**",
@@ -232,7 +235,7 @@
       "id": "manual.aeropress-timer",
       "name": "AeroPress timer handles an action without a water target",
       "path": "/?brew=aeropress-inverted&shot=active",
-      "expectText": "Now \u00b7 Stir",
+      "expectText": "Now · Stir",
       "expectSelector": "#timer-panel[data-focus=\"active\"]",
       "visual": true,
       "impact": [
@@ -296,6 +299,26 @@
         "server.js",
         "dapp.json"
       ]
+    },
+    {
+      "id": "coffees.library",
+      "name": "Coffee library lists private saved coffees",
+      "path": "/?coffees=1&demo=1",
+      "expectText": "My coffees",
+      "expectSelector": "#coffees-list .journal-card[data-coffee-id]",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "coffees.detail",
+      "name": "A saved coffee shows its brew history and details",
+      "path": "/?coffees=1&demo=1&coffee=9001",
+      "expectText": "Brew history",
+      "expectSelector": "#coffee-brew-list .journal-card[data-entry-id]"
     },
     {
       "id": "offline.sync-status",

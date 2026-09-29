@@ -63,6 +63,9 @@
     journalDetail: document.getElementById('journal-detail-screen'),
     journalForm: document.getElementById('journal-form-screen'),
     myRecipes: document.getElementById('my-recipes-screen'),
+    coffees: document.getElementById('coffees-screen'),
+    coffeeDetail: document.getElementById('coffee-detail-screen'),
+    coffeeForm: document.getElementById('coffee-form-screen'),
     recipeForm: document.getElementById('recipe-form-screen'),
     shelf: document.getElementById('shelf-screen'),
     collection: document.getElementById('collection-screen'),
@@ -310,6 +313,51 @@
     collectionPickerCreate: document.getElementById('collection-picker-create'),
     collectionPickerName: document.getElementById('collection-picker-name'),
     collectionPickerError: document.getElementById('collection-picker-error'),
+    coffeesButton: document.getElementById('coffees-button'),
+    coffeesActive: document.getElementById('coffees-active'),
+    coffeesFinished: document.getElementById('coffees-finished'),
+    coffeesArchived: document.getElementById('coffees-archived'),
+    coffeesFilters: document.getElementById('coffees-filters'),
+    coffeesClearFilters: document.getElementById('coffees-clear-filters'),
+    coffeeNew: document.getElementById('coffee-new'),
+    coffeesStatus: document.getElementById('coffees-status'),
+    coffeesList: document.getElementById('coffees-list'),
+    coffeesEmpty: document.getElementById('coffees-empty'),
+    coffeesEmptyTitle: document.getElementById('coffees-empty-title'),
+    coffeesEmptyCopy: document.getElementById('coffees-empty-copy'),
+    coffeesEmptyAction: document.getElementById('coffees-empty-action'),
+    coffeesError: document.getElementById('coffees-error'),
+    coffeesErrorCopy: document.getElementById('coffees-error-copy'),
+    coffeesRetry: document.getElementById('coffees-retry'),
+    coffeeDetailTitle: document.getElementById('coffee-detail-title'),
+    coffeeDetailSubtitle: document.getElementById('coffee-detail-subtitle'),
+    coffeeDetailStatus: document.getElementById('coffee-detail-status'),
+    coffeeDemoBadge: document.getElementById('coffee-demo-badge'),
+    coffeeDetailDetails: document.getElementById('coffee-detail-details'),
+    coffeeLastBrewDetails: document.getElementById('coffee-last-brew-details'),
+    coffeeHistoryCount: document.getElementById('coffee-history-count'),
+    coffeeSuccessCopy: document.getElementById('coffee-success-copy'),
+    coffeeBrewList: document.getElementById('coffee-brew-list'),
+    coffeeBrewEmpty: document.getElementById('coffee-brew-empty'),
+    coffeeLogBrew: document.getElementById('coffee-log-brew'),
+    coffeeNewBag: document.getElementById('coffee-new-bag'),
+    coffeeEdit: document.getElementById('coffee-edit'),
+    coffeeFavorite: document.getElementById('coffee-favorite'),
+    coffeeFavoriteLabel: document.getElementById('coffee-favorite-label'),
+    coffeeStatus: document.getElementById('coffee-status'),
+    coffeeDelete: document.getElementById('coffee-delete'),
+    coffeeDeleteConfirmation: document.getElementById('coffee-delete-confirmation'),
+    coffeeDeleteCancel: document.getElementById('coffee-delete-cancel'),
+    coffeeDeleteConfirm: document.getElementById('coffee-delete-confirm'),
+    coffeeDetailError: document.getElementById('coffee-detail-error'),
+    coffeeFormKicker: document.getElementById('coffee-form-kicker'),
+    coffeeFormTitle: document.getElementById('coffee-form-title'),
+    coffeeFormIntro: document.getElementById('coffee-form-intro'),
+    coffeeForm: document.getElementById('coffee-form'),
+    coffeeFormError: document.getElementById('coffee-form-error'),
+    coffeeFormSave: document.getElementById('coffee-form-save'),
+    coffeeFormCancel: document.getElementById('coffee-form-cancel'),
+    journalFormCoffee: document.getElementById('journal-form-coffee'),
     collectionPickerClose: document.getElementById('collection-picker-close'),
     collectionPickerDone: document.getElementById('collection-picker-done'),
     glossary: document.getElementById('glossary-button'),
@@ -383,6 +431,18 @@
       recentlyBrewed: [],
       view: 'favorites',
       loadedDemo: null,
+    },
+    coffees: {
+      list: [],
+      coffee: null,
+      brews: [],
+      loaded: false,
+      loadedDemo: null,
+      demo: false,
+      view: 'active',
+      q: '',
+      formMode: 'create',
+      formCoffeeId: null,
     },
     shelfFilters: { favorites: false, brewed: false },
     collection: { id: null, recipeId: null },
@@ -1015,7 +1075,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'adjust', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'adjust', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'coffees', 'coffee', 'coffeeForm', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
       .forEach((key) => url.searchParams.delete(key));
   }
 
@@ -1045,6 +1105,24 @@
       url.searchParams.set('recipeEditor', id || 'new');
       if (state.personal.parentRecipeRef) url.searchParams.set('source', state.personal.parentRecipeRef);
       if (state.personal.demo) url.searchParams.set('demo', '1');
+    }
+    if (screen === 'coffees') {
+      url.searchParams.set('coffees', state.coffees.demo ? 'demo' : '1');
+      url.searchParams.set('view', state.coffees.view);
+      if (state.coffees.q) url.searchParams.set('q', state.coffees.q);
+    }
+    if (screen === 'coffeeDetail') {
+      url.searchParams.set('coffees', state.coffees.demo ? 'demo' : '1');
+      url.searchParams.set('coffee', id);
+    }
+    if (screen === 'coffeeForm') {
+      if (state.coffees.formMode === 'edit') {
+        url.searchParams.set('coffeeForm', 'edit');
+        url.searchParams.set('coffee', id);
+      } else {
+        url.searchParams.set('coffeeForm', 'new');
+      }
+      if (state.coffees.demo) url.searchParams.set('demo', '1');
     }
     if (screen === 'journal') {
       url.searchParams.set('journal', state.journal.demo ? 'demo' : '1');
@@ -1141,6 +1219,37 @@
       });
       return;
     }
+    const coffeesMode = params.get('coffees');
+    const coffeeId = params.get('coffee');
+    const coffeeForm = params.get('coffeeForm');
+    if (coffeeForm === 'new') {
+      openCoffeeForm({ historyMode: null, focus, transition: 'none' });
+      return;
+    }
+    if (coffeeForm === 'edit' && coffeeId) {
+      openCoffeeEdit(coffeeId, { historyMode: null, focus, transition: 'none' });
+      return;
+    }
+    if (coffeeId && (coffeesMode === '1' || coffeesMode === 'demo')) {
+      openCoffeeDetail(coffeeId, {
+        demo,
+        historyMode: null,
+        focus,
+        transition: 'none',
+      });
+      return;
+    }
+    if (coffeesMode === '1' || coffeesMode === 'demo') {
+      openCoffees({
+        demo,
+        view: params.get('view'),
+        q: params.get('q') || '',
+        historyMode: null,
+        focus,
+        transition: 'none',
+      });
+      return;
+    }
     const journalMode = params.get('journal');
     const journalEntryId = params.get('entry');
     const journalEditId = params.get('edit');
@@ -1150,6 +1259,7 @@
         dose: params.get('dose'),
         source: params.get('from') === 'brew' ? 'guided' : 'manual',
         returnTo: params.get('from') || 'journal',
+        demo,
         historyMode: null,
         focus,
         transition: 'none',
@@ -1364,6 +1474,370 @@
     if (historyMode) history[historyMode]({ screen: 'journal' }, '', urlFor('journal'));
     showScreen('journal', { focus, transition });
     loadJournal();
+  }
+
+  // -------------------------------------------------------------------------
+  // Personal coffee library.
+  //
+  // A private list of the bags and lots the user brews. Journal entries keep
+  // their own coffee snapshot from brew time, so editing or archiving a saved
+  // coffee never rewrites history.
+  // -------------------------------------------------------------------------
+
+  function coffeesApiPath(path = '', params = {}) {
+    const query = new URLSearchParams();
+    if (state.coffees.demo) query.set('demo', '1');
+    for (const [key, value] of Object.entries(params)) {
+      if (value) query.set(key, value);
+    }
+    const suffix = query.toString();
+    return `/api/coffees${path}${suffix ? `?${suffix}` : ''}`;
+  }
+
+  function coffeeStatusLabel(status) {
+    return { active: 'Active', finished: 'Finished', archived: 'Archived' }[status] || status;
+  }
+
+  function coffeeCard(coffee) {
+    const secondary = [coffee.roaster, coffee.origin].filter(Boolean).join(' · ') || 'Details not recorded';
+    return `
+      <button class="journal-card" type="button" data-coffee-id="${escapeHtml(coffee.id)}">
+        <span class="journal-card-topline">
+          <span>${escapeHtml(coffeeStatusLabel(coffee.status))}${coffee.favorite ? ' · ★ Favorite' : ''}</span>
+          <span>${coffee.roastDate ? escapeHtml(formatDate(`${coffee.roastDate}T00:00:00`)) : ''}</span>
+        </span>
+        <span class="journal-card-title">${escapeHtml(coffee.name)}</span>
+        <span class="journal-card-coffee">${escapeHtml(secondary)}</span>
+        <span class="journal-card-change">${coffee.process ? escapeHtml(`${coffee.process} process`) : 'Process not recorded'}</span>
+        <span class="journal-card-footer">
+          <span>${coffee.roastLevel ? escapeHtml(coffee.roastLevel) : 'Roast level not recorded'}</span>
+          <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
+        </span>
+      </button>`;
+  }
+
+  function renderCoffees() {
+    const view = state.coffees.view;
+    const q = state.coffees.q.trim().toLowerCase();
+    const list = state.coffees.list.filter((coffee) => {
+      if (coffee.status !== view) return false;
+      if (!q) return true;
+      return [coffee.name, coffee.roaster, coffee.origin, coffee.variety, coffee.process, coffee.tastingNotes]
+        .filter(Boolean).join(' ').toLowerCase().includes(q);
+    });
+    for (const tab of ['active', 'finished', 'archived']) {
+      elements[`coffees${tab[0].toUpperCase()}${tab.slice(1)}`].setAttribute('aria-pressed', String(view === tab));
+    }
+    elements.coffeesFilters.elements.q.value = state.coffees.q;
+    elements.coffeesClearFilters.hidden = !state.coffees.q;
+    elements.coffeesList.innerHTML = list.map(coffeeCard).join('');
+    elements.coffeesList.hidden = list.length === 0;
+    elements.coffeesEmpty.hidden = list.length !== 0;
+    elements.coffeesEmptyTitle.textContent = state.coffees.q
+      ? 'No coffees match this search'
+      : view === 'active' ? 'No coffees saved yet'
+        : view === 'finished' ? 'No finished coffees'
+          : 'No archived coffees';
+    elements.coffeesEmptyCopy.textContent = state.coffees.q
+      ? 'Try a different word, or clear the search to see the whole view.'
+      : view === 'active' ? 'Add a bag once and every future brew can start from its details.'
+        : 'Coffees you mark finished or archived will wait here.';
+    elements.coffeesEmptyAction.textContent = state.coffees.q || view !== 'active'
+      ? 'Add a coffee' : 'Add your first coffee';
+    elements.coffeesStatus.textContent = state.coffees.demo
+      ? 'Showing read-only staging examples. Your private coffee library uses the same layout.'
+      : `${list.length} ${list.length === 1 ? 'coffee' : 'coffees'}`;
+  }
+
+  function syncCoffeePicker() {
+    if (!elements.journalFormCoffee) return;
+    const selected = elements.journalFormCoffee.value;
+    const pickable = state.coffees.list.filter((coffee) => coffee.status === 'active' || coffee.status === 'finished');
+    elements.journalFormCoffee.innerHTML = '<option value="">Not saved</option>'
+      + pickable.map((coffee) => `<option value="${escapeHtml(coffee.id)}">${escapeHtml(coffee.name)}</option>`).join('');
+    if (pickable.some((coffee) => String(coffee.id) === String(selected))) {
+      elements.journalFormCoffee.value = selected;
+    }
+  }
+
+  let coffeesRequestSeq = 0;
+
+  async function loadCoffees({ demo = state.coffees.demo, quiet = false } = {}) {
+    const requestId = (coffeesRequestSeq += 1);
+    state.coffees.demo = demo;
+    if (!quiet) {
+      elements.coffeesStatus.textContent = 'Loading your coffees…';
+      elements.coffeesError.hidden = true;
+      elements.coffeesEmpty.hidden = true;
+    }
+    try {
+      const payload = await apiFetch(coffeesApiPath('', { includeArchived: '1', demo: demo ? '1' : '' }));
+      if (requestId !== coffeesRequestSeq) return;
+      state.coffees.list = payload.coffees || [];
+      state.coffees.demo = Boolean(payload.demo);
+      state.coffees.loaded = true;
+      state.coffees.loadedDemo = Boolean(payload.demo);
+      renderCoffees();
+      syncCoffeePicker();
+    } catch (error) {
+      if (requestId !== coffeesRequestSeq) return;
+      state.coffees.list = [];
+      state.coffees.loaded = false;
+      elements.coffeesStatus.textContent = '';
+      elements.coffeesErrorCopy.textContent = error.message;
+      elements.coffeesError.hidden = false;
+      elements.coffeesList.hidden = true;
+      elements.coffeesEmpty.hidden = true;
+    }
+  }
+
+  function openCoffees({ demo = state.coffees.demo, view = 'active', q = '', historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    const demoChanged = Boolean(demo) !== state.coffees.loadedDemo;
+    state.coffees.view = ['active', 'finished', 'archived'].includes(view) ? view : 'active';
+    state.coffees.q = String(q).slice(0, 120);
+    state.coffees.demo = demo;
+    if (historyMode) history[historyMode]({ screen: 'coffees' }, '', urlFor('coffees'));
+    showScreen('coffees', { focus, transition });
+    if (!state.coffees.loaded || demoChanged) loadCoffees({ demo });
+    else renderCoffees();
+  }
+
+  function coffeeDefinitionRows(coffee) {
+    return definitionRows([
+      ['Coffee', coffee.name],
+      ['Roaster', coffee.roaster],
+      ['Origin', coffee.origin],
+      ['Variety', coffee.variety],
+      ['Process', coffee.process],
+      ['Roast level', coffee.roastLevel],
+      ['Roast date', coffee.roastDate ? formatDate(`${coffee.roastDate}T00:00:00`) : null],
+      ['Tasting notes', coffee.tastingNotes],
+      ['Purchase details', coffee.purchaseDetails],
+    ]);
+  }
+
+  function renderCoffeeDetail() {
+    const coffee = state.coffees.coffee;
+    if (!coffee) return;
+    elements.coffeeDetailTitle.textContent = coffee.name;
+    elements.coffeeDetailSubtitle.textContent = [coffee.roaster, coffee.origin].filter(Boolean).join(' · ')
+      || 'Details as saved in your library.';
+    elements.coffeeDetailStatus.textContent = coffeeStatusLabel(coffee.status);
+    elements.coffeeDemoBadge.hidden = !state.coffees.demo;
+    elements.coffeeDetailDetails.innerHTML = coffeeDefinitionRows(coffee);
+    elements.coffeeStatus.value = coffee.status;
+    elements.coffeeFavorite.setAttribute('aria-pressed', String(Boolean(coffee.favorite)));
+    const brews = state.coffees.brews;
+    elements.coffeeHistoryCount.textContent = `${brews.length} ${brews.length === 1 ? 'brew' : 'brews'}`;
+    const successful = brews.filter((entry) => entry.overall === 4 || entry.overall === 5);
+    elements.coffeeSuccessCopy.textContent = brews.length
+      ? `${successful.length} of ${brews.length} ${brews.length === 1 ? 'brew scored' : 'brews scored'} 4 or higher. ${successful.length ? `Successful recipes: ${[...new Set(successful.map((entry) => entry.recipeSnapshot.title))].join(', ')}.` : 'No brew has scored 4 or higher yet.'}`
+      : 'Log a brew with this coffee to build its history here.';
+    elements.coffeeBrewList.innerHTML = brews.map(journalCard).join('');
+    elements.coffeeBrewList.hidden = brews.length === 0;
+    elements.coffeeBrewEmpty.hidden = brews.length !== 0;
+    const last = brews[0];
+    elements.coffeeLastBrewDetails.innerHTML = last
+      ? definitionRows([
+        ['Brewed', formatDate(last.brewedAt, true)],
+        ['Recipe', last.recipeSnapshot.title],
+        ['Grinder', last.grinder],
+        ['Grind setting', last.grindSetting],
+        ['Water', last.water],
+        ['Gear', last.gear],
+      ])
+      : definitionRows([['Grinder', null], ['Grind setting', null], ['Water', null], ['Gear', null]]);
+    for (const control of [elements.coffeeLogBrew, elements.coffeeNewBag, elements.coffeeEdit, elements.coffeeFavorite, elements.coffeeStatus, elements.coffeeDelete]) {
+      control.disabled = Boolean(state.coffees.demo);
+    }
+    elements.coffeeDeleteConfirmation.hidden = true;
+    elements.coffeeDetailError.hidden = true;
+  }
+
+  async function loadCoffeeDetail(id) {
+    const payload = await apiFetch(coffeesApiPath(`/${encodeURIComponent(id)}/brews`));
+    state.coffees.coffee = payload.coffee;
+    state.coffees.brews = payload.entries || [];
+    state.coffees.demo = Boolean(payload.demo);
+    return payload.coffee;
+  }
+
+  async function openCoffeeDetail(id, { demo = false, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    state.coffees.demo = demo;
+    elements.coffeeDetailTitle.textContent = 'Loading coffee…';
+    elements.coffeeDetailError.hidden = true;
+    if (historyMode) history[historyMode]({ screen: 'coffeeDetail', id }, '', urlFor('coffeeDetail', id));
+    showScreen('coffeeDetail', { focus, transition });
+    try {
+      await loadCoffeeDetail(id);
+      renderCoffeeDetail();
+    } catch (error) {
+      elements.coffeeDetailTitle.textContent = 'Coffee unavailable';
+      elements.coffeeDetailError.textContent = error.message;
+      elements.coffeeDetailError.hidden = false;
+    }
+  }
+
+  function replaceCoffee(coffee) {
+    state.coffees.list = [
+      coffee,
+      ...state.coffees.list.filter((candidate) => String(candidate.id) !== String(coffee.id)),
+    ];
+    state.coffees.loaded = true;
+    state.coffees.loadedDemo = false;
+    syncCoffeePicker();
+  }
+
+  function openCoffeeForm({ coffee = null, historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    const editing = Boolean(coffee);
+    state.coffees.formMode = editing ? 'edit' : 'create';
+    state.coffees.formCoffeeId = editing ? coffee.id : null;
+    elements.coffeeForm.reset();
+    if (editing) {
+      for (const field of ['name', 'roaster', 'origin', 'variety', 'process', 'roastLevel', 'roastDate', 'tastingNotes', 'purchaseDetails']) {
+        const control = elements.coffeeForm.elements[field];
+        if (control) control.value = coffee[field] ?? '';
+      }
+    }
+    elements.coffeeFormKicker.textContent = editing ? 'Saved coffee' : 'New saved coffee';
+    elements.coffeeFormTitle.textContent = editing ? 'Edit coffee' : 'Add a coffee';
+    elements.coffeeFormIntro.textContent = editing
+      ? 'Update the bag details. Past brews keep the coffee snapshot they were saved with.'
+      : 'Only the coffee name is required. Fill in what you know; you can always edit later.';
+    elements.coffeeFormSave.textContent = editing ? 'Save coffee' : 'Save coffee';
+    elements.coffeeFormError.hidden = true;
+    if (historyMode) history[historyMode]({ screen: 'coffeeForm' }, '', urlFor('coffeeForm', editing ? coffee.id : 'new'));
+    showScreen('coffeeForm', { focus, transition });
+  }
+
+  async function openCoffeeEdit(id, { historyMode = 'pushState', focus = true, transition = 'push' } = {}) {
+    try {
+      const coffee = state.coffees.list.find((candidate) => String(candidate.id) === String(id))
+        || await (async () => {
+          const payload = await apiFetch(coffeesApiPath(`/${encodeURIComponent(id)}`));
+          return payload.coffee;
+        })();
+      openCoffeeForm({ coffee, historyMode, focus, transition });
+    } catch (error) {
+      openCoffees({ historyMode: 'replaceState', transition: 'none' });
+      elements.coffeesStatus.textContent = error.message;
+    }
+  }
+
+  function readCoffeeForm() {
+    const form = new FormData(elements.coffeeForm);
+    return Object.fromEntries(form.entries());
+  }
+
+  async function saveCoffeeForm(event) {
+    event.preventDefault();
+    elements.coffeeFormError.hidden = true;
+    elements.coffeeFormSave.disabled = true;
+    elements.coffeeFormSave.textContent = 'Saving…';
+    try {
+      const editing = state.coffees.formMode === 'edit';
+      const path = editing
+        ? `/api/coffees/${encodeURIComponent(state.coffees.formCoffeeId)}`
+        : '/api/coffees';
+      const payload = await queueableFetch(path, {
+        method: editing ? 'PATCH' : 'POST',
+        body: JSON.stringify(readCoffeeForm()),
+      });
+      if (!payload) throw new Error('You are offline. This coffee is queued and will sync when the connection returns.');
+      state.coffees.demo = false;
+      replaceCoffee(payload.coffee);
+      renderCoffees();
+      history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+      showScreen('coffees', { transition: 'pop' });
+      if (window.unNative?.toast) window.unNative.toast(editing ? 'Coffee updated' : 'Coffee saved');
+    } catch (error) {
+      elements.coffeeFormError.textContent = error.message;
+      elements.coffeeFormError.hidden = false;
+    } finally {
+      elements.coffeeFormSave.disabled = false;
+      elements.coffeeFormSave.textContent = 'Save coffee';
+    }
+  }
+
+  async function updateCurrentCoffee(body) {
+    elements.coffeeDetailError.hidden = true;
+    try {
+      const payload = await queueableFetch(`/api/coffees/${encodeURIComponent(state.coffees.coffee.id)}`, {
+        method: 'PATCH', body: JSON.stringify(body),
+      });
+      replaceCoffee(payload.coffee);
+      state.coffees.coffee = payload.coffee;
+      renderCoffeeDetail();
+      if (window.unNative?.toast) window.unNative.toast('Coffee updated');
+    } catch (error) {
+      elements.coffeeDetailError.textContent = error.message;
+      elements.coffeeDetailError.hidden = false;
+    }
+  }
+
+  async function duplicateCurrentCoffee() {
+    elements.coffeeNewBag.disabled = true;
+    elements.coffeeDetailError.hidden = true;
+    try {
+      const payload = await queueableFetch(`/api/coffees/${encodeURIComponent(state.coffees.coffee.id)}/duplicate`, { method: 'POST' });
+      if (!payload) throw new Error('You are offline. The new bag is queued and will sync when the connection returns.');
+      replaceCoffee(payload.coffee);
+      openCoffeeDetail(payload.coffee.id, { transition: 'push' });
+      if (window.unNative?.toast) window.unNative.toast('New bag created');
+    } catch (error) {
+      elements.coffeeDetailError.textContent = error.message;
+      elements.coffeeDetailError.hidden = false;
+    } finally {
+      elements.coffeeNewBag.disabled = false;
+    }
+  }
+
+  async function deleteCurrentCoffee() {
+    elements.coffeeDeleteConfirm.disabled = true;
+    elements.coffeeDetailError.hidden = true;
+    try {
+      const coffeeId = state.coffees.coffee.id;
+      const removed = await queueableFetch(`/api/coffees/${encodeURIComponent(coffeeId)}`, { method: 'DELETE' });
+      if (!removed && window.unNative?.toast) window.unNative.toast('Delete queued while offline');
+      state.coffees.list = state.coffees.list.filter((candidate) => String(candidate.id) !== String(coffeeId));
+      syncCoffeePicker();
+      state.coffees.view = 'active';
+      openCoffees({ historyMode: 'replaceState', transition: 'pop' });
+      if (window.unNative?.toast) window.unNative.toast('Coffee deleted');
+    } catch (error) {
+      elements.coffeeDetailError.textContent = error.message;
+      elements.coffeeDetailError.hidden = false;
+    } finally {
+      elements.coffeeDeleteConfirm.disabled = false;
+    }
+  }
+
+  function applySavedCoffeeToForm() {
+    const coffeeId = elements.journalFormCoffee.value;
+    if (!coffeeId) return;
+    const coffee = state.coffees.list.find((candidate) => String(candidate.id) === String(coffeeId));
+    if (!coffee) return;
+    setJournalFormValue('coffeeName', coffee.name);
+    setJournalFormValue('roaster', coffee.roaster);
+    setJournalFormValue('process', coffee.process);
+    setJournalFormValue('roastDate', coffee.roastDate);
+  }
+
+  async function loadSavedCoffeeOptions() {
+    const demo = state.journal.demo;
+    if (state.coffees.loaded && state.coffees.loadedDemo === demo) {
+      syncCoffeePicker();
+      return;
+    }
+    try {
+      const payload = await apiFetch(coffeesApiPath('', { includeArchived: '1', demo: demo ? '1' : '' }));
+      state.coffees.list = payload.coffees || [];
+      state.coffees.loaded = true;
+      state.coffees.loadedDemo = Boolean(payload.demo);
+      syncCoffeePicker();
+    } catch {
+      // The picker stays on "Not saved"; free-text coffee fields still work.
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -2462,6 +2936,10 @@
     elements.journalFormSave.textContent = 'Save journal entry';
     elements.journalFormError.hidden = true;
     renderJournalFormRecipeMeta(state.recipe);
+    if (elements.journalFormCoffee) {
+      elements.journalFormCoffee.value = '';
+      loadSavedCoffeeOptions();
+    }
   }
 
   function prepareEditForm(entry) {
@@ -2497,6 +2975,9 @@
   }
 
   function openJournalForm(options = {}) {
+    // Staging previews use the demo picker options; a real account always
+    // reads its own library. Saving itself never depends on this flag.
+    state.journal.demo = Boolean(options.demo);
     prepareCreateForm(options);
     if (options.historyMode !== null) {
       history[options.historyMode || 'pushState']({ screen: 'journalForm' }, '', urlFor('journalForm'));
@@ -2519,7 +3000,13 @@
   }
 
   function readJournalForm() {
-    return Object.fromEntries(new FormData(elements.journalEntryForm).entries());
+    const body = Object.fromEntries(new FormData(elements.journalEntryForm).entries());
+    if (state.journal.formMode === 'edit') {
+      // The coffee linkage and snapshot are immutable: editing notes or setup
+      // fields never rewrites which coffee an entry recorded at brew time.
+      delete body.coffeeId;
+    }
+    return body;
   }
 
   async function saveJournalForm(event) {
@@ -2539,6 +3026,9 @@
         body.recipeVersion = state.recipe.version;
         body.coffee = elements.journalFormDose.value;
         body.source = state.journal.formSource;
+        if (elements.journalFormCoffee && elements.journalFormCoffee.value) {
+          body.coffeeId = elements.journalFormCoffee.value;
+        }
         payload = await queueableFetch('/api/brews', { method: 'POST', body: JSON.stringify(body) });
       }
       if (!payload) throw new Error('You are offline. This journal entry is queued and will sync when the connection returns.');
@@ -2928,6 +3418,99 @@
     navigate('brew', recipeRouteReference(state.recipe), { transition: 'push' });
   });
   elements.myRecipesButton.addEventListener('click', () => openMyRecipes({ transition: 'push' }));
+  elements.coffeesButton.addEventListener('click', () => openCoffees({ transition: 'push' }));
+  elements.coffeesActive.addEventListener('click', () => {
+    state.coffees.view = 'active';
+    history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+    renderCoffees();
+  });
+  elements.coffeesFinished.addEventListener('click', () => {
+    state.coffees.view = 'finished';
+    history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+    renderCoffees();
+  });
+  elements.coffeesArchived.addEventListener('click', () => {
+    state.coffees.view = 'archived';
+    history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+    renderCoffees();
+  });
+  elements.coffeesFilters.addEventListener('submit', (event) => {
+    event.preventDefault();
+    state.coffees.q = elements.coffeesFilters.elements.q.value.trim().slice(0, 120);
+    history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+    renderCoffees();
+  });
+  elements.coffeesFilters.elements.q.addEventListener('blur', () => {
+    state.coffees.q = elements.coffeesFilters.elements.q.value.trim().slice(0, 120);
+    history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+    renderCoffees();
+  });
+  elements.coffeesClearFilters.addEventListener('click', () => {
+    state.coffees.q = '';
+    elements.coffeesFilters.elements.q.value = '';
+    history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+    renderCoffees();
+  });
+  elements.coffeeNew.addEventListener('click', () => openCoffeeForm());
+  elements.coffeesEmptyAction.addEventListener('click', () => {
+    if (state.coffees.q || state.coffees.view !== 'active') {
+      state.coffees.q = '';
+      state.coffees.view = 'active';
+      history.replaceState({ screen: 'coffees' }, '', urlFor('coffees'));
+      renderCoffees();
+    } else {
+      openCoffeeForm();
+    }
+  });
+  elements.coffeesRetry.addEventListener('click', () => loadCoffees());
+  elements.coffeesList.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-coffee-id]');
+    if (card) openCoffeeDetail(card.dataset.coffeeId, { demo: state.coffees.demo });
+  });
+  elements.coffeeBrewList.addEventListener('click', (event) => {
+    const card = event.target.closest('[data-entry-id]');
+    if (card) openJournalDetail(card.dataset.entryId, { demo: state.coffees.demo });
+  });
+  elements.coffeeLogBrew.addEventListener('click', () => {
+    const coffee = state.coffees.coffee;
+    openJournalForm({ returnTo: 'coffeeDetail' });
+    if (coffee && elements.journalFormCoffee) {
+      const loadOptions = loadSavedCoffeeOptions();
+      if (loadOptions?.then) {
+        loadOptions.then(() => {
+          const option = [...elements.journalFormCoffee.options].find(
+            (candidate) => String(candidate.value) === String(coffee.id)
+          );
+          if (option) elements.journalFormCoffee.value = coffee.id;
+          applySavedCoffeeToForm();
+        });
+      }
+    }
+  });
+  elements.coffeeNewBag.addEventListener('click', duplicateCurrentCoffee);
+  elements.coffeeEdit.addEventListener('click', () => openCoffeeForm({ coffee: state.coffees.coffee }));
+  elements.coffeeFavorite.addEventListener('click', () => updateCurrentCoffee({ favorite: !state.coffees.coffee.favorite }));
+  elements.coffeeStatus.addEventListener('change', () => updateCurrentCoffee({ status: elements.coffeeStatus.value }));
+  elements.coffeeDelete.addEventListener('click', () => {
+    elements.coffeeDeleteConfirmation.hidden = false;
+    elements.coffeeDeleteConfirm.focus();
+  });
+  elements.coffeeDeleteCancel.addEventListener('click', () => {
+    elements.coffeeDeleteConfirmation.hidden = true;
+    elements.coffeeDelete.focus();
+  });
+  elements.coffeeDeleteConfirm.addEventListener('click', deleteCurrentCoffee);
+  elements.coffeeForm.addEventListener('submit', saveCoffeeForm);
+  elements.coffeeFormCancel.addEventListener('click', () => {
+    if (state.coffees.formMode === 'edit' && state.coffees.formCoffeeId) {
+      openCoffeeDetail(state.coffees.formCoffeeId, { historyMode: 'replaceState', transition: 'pop' });
+    } else {
+      openCoffees({ historyMode: 'replaceState', transition: 'pop' });
+    }
+  });
+  if (elements.journalFormCoffee) {
+    elements.journalFormCoffee.addEventListener('change', applySavedCoffeeToForm);
+  }
   elements.personalRecipesList.addEventListener('click', handleRecipeCardClick);
   elements.personalRecipesActive.addEventListener('click', () => {
     state.personal.view = 'active';
@@ -3139,6 +3722,8 @@
       openJournalDetail(state.journal.entry.id, { historyMode: 'replaceState', transition: 'pop' });
     } else if (state.journal.returnTo === 'brew') {
       navigate('brew', recipeRouteReference(state.recipe), { replace: true, transition: 'pop' });
+    } else if (state.journal.returnTo === 'coffeeDetail' && state.coffees.coffee) {
+      openCoffeeDetail(state.coffees.coffee.id, { historyMode: 'replaceState', transition: 'pop' });
     } else {
       openJournal({ historyMode: 'replaceState', transition: 'pop' });
     }
@@ -3203,10 +3788,14 @@
     else if (state.screen === 'recipe' && state.recipe.isPersonal) openMyRecipes({ historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'recipe') navigate('method', state.recipe.methodId, { transition: 'pop' });
     else if (state.screen === 'myRecipes') navigate('library', null, { transition: 'pop' });
+    else if (state.screen === 'coffees') navigate('library', null, { transition: 'pop' });
+    else if (state.screen === 'coffeeDetail') openCoffees({ historyMode: 'replaceState', transition: 'pop' });
+    else if (state.screen === 'coffeeForm') elements.coffeeFormCancel.click();
     else if (state.screen === 'recipeForm') elements.personalRecipeFormCancel.click();
     else if (state.screen === 'journalDetail') openJournal({ demo: state.journal.demo, historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'journalForm' && state.journal.formMode === 'edit') openJournalDetail(state.journal.entry.id, { historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'journalForm' && state.journal.returnTo === 'brew') navigate('brew', recipeRouteReference(state.recipe), { replace: true, transition: 'pop' });
+    else if (state.screen === 'journalForm' && state.journal.returnTo === 'coffeeDetail' && state.coffees.coffee) openCoffeeDetail(state.coffees.coffee.id, { historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'journalForm') openJournal({ historyMode: 'replaceState', transition: 'pop' });
     else navigate('library', null, { transition: 'pop' });
   });
@@ -3391,6 +3980,9 @@
     ]);
     populateJournalControls();
     loadShelf({ quiet: true });
+    loadCoffees({ quiet: true }).then(() => {
+      if (state.coffees.loaded) syncCoffeePicker();
+    });
     parseLocation();
   })();
 })();

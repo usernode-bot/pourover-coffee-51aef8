@@ -88,10 +88,18 @@ function normalizeCreateInput(body = {}) {
     throw new JournalValidationError('Coffee dose must be a whole number from 5g to 60g.');
   }
   const source = body.source === 'guided' ? 'guided' : 'manual';
+  const coffeeIdValue = body.coffeeId;
+  const coffeeId = coffeeIdValue === null || coffeeIdValue === undefined || coffeeIdValue === ''
+    ? null
+    : Number(coffeeIdValue);
+  if (coffeeId !== null && (!Number.isSafeInteger(coffeeId) || coffeeId <= 0)) {
+    throw new JournalValidationError('Choose a valid saved coffee.');
+  }
   return {
     recipeId,
     recipeVersion,
     coffee,
+    coffeeId,
     source,
     brewedAt: new Date().toISOString(),
     ...normalizeEditableFields(body),
@@ -121,6 +129,8 @@ function rowToEntry(row) {
     recipeVersion: row.recipe_version,
     recipeRevisionId: row.recipe_revision_id,
     recipeSnapshot: row.recipe_snapshot,
+    coffeeId: row.coffee_id === null || row.coffee_id === undefined ? null : Number(row.coffee_id),
+    coffeeSnapshot: row.coffee_snapshot || null,
     coffeeName: row.coffee_name,
     roaster: row.roaster,
     process: row.process,
@@ -174,9 +184,15 @@ async function initializeJournal(pool) {
     )
   `);
   await pool.query("COMMENT ON TABLE brew_journal_entries IS 'staging:private'");
+  await pool.query('ALTER TABLE brew_journal_entries ADD COLUMN IF NOT EXISTS coffee_id BIGINT');
+  await pool.query('ALTER TABLE brew_journal_entries ADD COLUMN IF NOT EXISTS coffee_snapshot JSONB');
   await pool.query(`
     CREATE INDEX IF NOT EXISTS brew_journal_entries_user_brewed_idx
     ON brew_journal_entries (user_id, brewed_at DESC, id DESC)
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS brew_journal_entries_user_coffee_idx
+    ON brew_journal_entries (user_id, coffee_id, brewed_at DESC)
   `);
   return true;
 }
@@ -190,6 +206,7 @@ async function listEntries(pool, userId, filters = {}) {
   };
   if (filters.methodId) add("recipe_snapshot->>'methodId' = ?", filters.methodId);
   if (filters.recipeId) add('recipe_id = ?', filters.recipeId);
+  if (filters.coffeeId) add('coffee_id = ?', filters.coffeeId);
   if (filters.q) {
     add(`CONCAT_WS(' ', coffee_name, roaster, notes, change_next_time,
       recipe_snapshot->>'title', recipe_snapshot->>'methodName') ILIKE ?`, `%${filters.q}%`);
@@ -212,16 +229,20 @@ async function getEntry(pool, userId, entryId) {
   return rowToEntry(rows[0]);
 }
 
-async function createEntry(pool, user, input, recipeSnapshot) {
+async function createEntry(pool, user, input, recipeSnapshot, coffeeSnapshot = null) {
+  const hasCoffee = Boolean(input.coffeeId) && coffeeSnapshot !== null;
+  const coffeeColumns = hasCoffee ? ', coffee_id, coffee_snapshot' : '';
+  const coffeePlaceholders = hasCoffee ? ', $24, $25::jsonb' : '';
+  const coffeeValues = hasCoffee ? [input.coffeeId, JSON.stringify(coffeeSnapshot)] : [];
   const { rows } = await pool.query(
     `INSERT INTO brew_journal_entries (
       user_id, username, source, brewed_at, recipe_id, recipe_version,
       recipe_revision_id, recipe_snapshot, coffee_name, roaster, process,
       roast_date, grinder, grind_setting, water, gear, sweetness, acidity,
-      body, clarity, overall, notes, change_next_time
+      body, clarity, overall, notes, change_next_time${coffeeColumns}
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13,
-      $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+      $14, $15, $16, $17, $18, $19, $20, $21, $22, $23${coffeePlaceholders}
     ) RETURNING *`,
     [
       user.id, String(user.username || ''), input.source, input.brewedAt,
@@ -232,6 +253,7 @@ async function createEntry(pool, user, input, recipeSnapshot) {
       input.sweetness || null, input.acidity || null, input.body || null,
       input.clarity || null, input.overall || null, input.notes || null,
       input.changeNextTime || null,
+      ...coffeeValues,
     ]
   );
   return rowToEntry(rows[0]);

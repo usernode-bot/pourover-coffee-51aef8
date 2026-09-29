@@ -14,6 +14,7 @@ const {
 const journal = require('./journal-store');
 const collections = require('./collection-store');
 const personalRecipes = require('./personal-recipe-store');
+const coffees = require('./coffee-store');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -96,6 +97,12 @@ function requirePersonalRecipes(res) {
   return false;
 }
 
+function requireCoffees(res) {
+  if (pool) return true;
+  res.status(503).json({ error: 'The coffee library is unavailable right now.' });
+  return false;
+}
+
 function entryForClient(entry, personalCurrent = new Map()) {
   if (!entry) return null;
   const current = RECIPES.find((recipe) => recipe.id === entry.recipeId)
@@ -129,6 +136,21 @@ function demoJournalEntries() {
       recipeVersion: 1,
       recipeRevisionId: 'v60-sweet-pulse@1',
       recipeSnapshot: createRecipeSnapshot('v60-sweet-pulse@1', 21),
+      coffeeId: 9001,
+      coffeeSnapshot: {
+        id: 9001,
+        name: 'Staging demo: Finca El Jardín',
+        roaster: 'Example Roaster',
+        origin: 'Huila, Colombia',
+        variety: 'Caturra',
+        process: 'Washed',
+        roastLevel: 'Light',
+        roastDate: '2026-09-04',
+        tastingNotes: 'Honeyed sweetness with stone fruit and a clear finish.',
+        purchaseDetails: '250g bag, $19, bought direct from the roaster.',
+        favorite: true,
+        status: 'active',
+      },
       coffeeName: 'Staging demo: Finca El Jardín',
       roaster: 'Example Roaster',
       process: 'Washed',
@@ -173,6 +195,60 @@ function demoJournalEntries() {
       createdAt: '2026-09-13T16:15:00.000Z',
       updatedAt: '2026-09-13T16:15:00.000Z',
     }),
+  ];
+}
+
+function demoCoffees() {
+  const base = {
+    createdAt: '2026-09-17T12:00:00.000Z',
+    updatedAt: '2026-09-17T12:00:00.000Z',
+  };
+  return [
+    {
+      ...base,
+      id: 9001,
+      name: 'Staging demo: Finca El Jardín',
+      roaster: 'Example Roaster',
+      origin: 'Huila, Colombia',
+      variety: 'Caturra',
+      process: 'Washed',
+      roastLevel: 'Light',
+      roastDate: '2026-09-04',
+      tastingNotes: 'Honeyed sweetness with stone fruit and a clear finish.',
+      purchaseDetails: '250g bag, $19, bought direct from the roaster.',
+      status: 'active',
+      favorite: true,
+    },
+    {
+      ...base,
+      id: 9002,
+      name: 'Staging demo: Serra do Caparaó',
+      roaster: 'Sample Coffee Co.',
+      origin: 'Minas Gerais, Brazil',
+      variety: 'Mundo Novo',
+      process: 'Natural',
+      roastLevel: 'Medium',
+      roastDate: '2026-09-01',
+      tastingNotes: 'Full body with cocoa and a jammy finish.',
+      purchaseDetails: null,
+      status: 'finished',
+      favorite: false,
+    },
+    {
+      ...base,
+      id: 9003,
+      name: 'Staging demo: Cerro Grande lot 2',
+      roaster: 'Example Roaster',
+      origin: null,
+      variety: null,
+      process: 'Honey',
+      roastLevel: 'Light-medium',
+      roastDate: null,
+      tastingNotes: null,
+      purchaseDetails: null,
+      status: 'archived',
+      favorite: false,
+    },
   ];
 }
 
@@ -248,6 +324,127 @@ function sendJournalError(res, error) {
   return res.status(500).json({ error: 'The brew journal could not complete that request.' });
 }
 
+function sendCoffeeError(res, error) {
+  if (error instanceof coffees.CoffeeValidationError) {
+    return res.status(400).json({ error: error.message });
+  }
+  console.error(`Coffee library request failed: ${error.message}`);
+  return res.status(500).json({ error: 'The coffee library could not complete that request.' });
+}
+
+app.get('/api/coffees', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') {
+      const q = String(req.query.q || '').trim().toLowerCase().slice(0, 120);
+      const status = ['active', 'finished', 'archived'].includes(req.query.status)
+        ? req.query.status : null;
+      const includeArchived = req.query.includeArchived === '1';
+      const list = demoCoffees().filter((coffee) => {
+        if (status && coffee.status !== status) return false;
+        if (!status && !includeArchived && coffee.status === 'archived') return false;
+        if (!q) return true;
+        return [coffee.name, coffee.roaster, coffee.origin, coffee.variety, coffee.process, coffee.tastingNotes]
+          .filter(Boolean).join(' ').toLowerCase().includes(q);
+      });
+      return res.json({ coffees: list, demo: true });
+    }
+    if (!requireCoffees(res)) return undefined;
+    const status = ['active', 'finished', 'archived'].includes(req.query.status)
+      ? req.query.status : null;
+    const q = String(req.query.q || '').trim().slice(0, 120);
+    const list = await coffees.listCoffees(pool, req.user.id, {
+      status,
+      q,
+      includeArchived: req.query.includeArchived === '1',
+    });
+    return res.json({ coffees: list, demo: false });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
+app.post('/api/coffees', async (req, res) => {
+  try {
+    if (!requireCoffees(res)) return undefined;
+    const coffee = await coffees.createCoffee(pool, req.user, req.body);
+    return res.status(201).json({ coffee });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
+app.get('/api/coffees/:id', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') {
+      const coffee = demoCoffees().find((candidate) => String(candidate.id) === String(req.params.id));
+      return coffee ? res.json({ coffee, demo: true }) : res.status(404).json({ error: 'Coffee not found.' });
+    }
+    if (!requireCoffees(res)) return undefined;
+    const coffeeId = coffees.parseCoffeeId(req.params.id);
+    if (!coffeeId) return res.status(404).json({ error: 'Coffee not found.' });
+    const coffee = await coffees.getCoffee(pool, req.user.id, coffeeId);
+    return coffee ? res.json({ coffee }) : res.status(404).json({ error: 'Coffee not found.' });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
+app.patch('/api/coffees/:id', async (req, res) => {
+  try {
+    if (!requireCoffees(res)) return undefined;
+    const coffeeId = coffees.parseCoffeeId(req.params.id);
+    if (!coffeeId) return res.status(404).json({ error: 'Coffee not found.' });
+    const updated = await coffees.updateCoffee(pool, req.user.id, coffeeId, req.body);
+    return updated ? res.json({ coffee: updated }) : res.status(404).json({ error: 'Coffee not found.' });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
+app.post('/api/coffees/:id/duplicate', async (req, res) => {
+  try {
+    if (!requireCoffees(res)) return undefined;
+    const coffeeId = coffees.parseCoffeeId(req.params.id);
+    if (!coffeeId) return res.status(404).json({ error: 'Coffee not found.' });
+    const duplicated = await coffees.duplicateCoffee(pool, req.user, coffeeId);
+    return duplicated ? res.status(201).json({ coffee: duplicated }) : res.status(404).json({ error: 'Coffee not found.' });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
+app.get('/api/coffees/:id/brews', async (req, res) => {
+  try {
+    if (IS_STAGING && req.query.demo === '1') {
+      const coffee = demoCoffees().find((candidate) => String(candidate.id) === String(req.params.id));
+      if (!coffee) return res.status(404).json({ error: 'Coffee not found.' });
+      const entries = demoJournalEntries().filter((entry) => entry.coffeeSnapshot?.id === coffee.id);
+      return res.json({ coffee, entries, demo: true });
+    }
+    if (!requireCoffees(res)) return undefined;
+    const coffeeId = coffees.parseCoffeeId(req.params.id);
+    if (!coffeeId) return res.status(404).json({ error: 'Coffee not found.' });
+    const coffee = await coffees.getCoffee(pool, req.user.id, coffeeId);
+    if (!coffee) return res.status(404).json({ error: 'Coffee not found.' });
+    const entries = await journal.listEntries(pool, req.user.id, { coffeeId });
+    return res.json({ coffee, entries: await entriesForClient(req.user.id, entries) });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
+app.delete('/api/coffees/:id', async (req, res) => {
+  try {
+    if (!requireCoffees(res)) return undefined;
+    const coffeeId = coffees.parseCoffeeId(req.params.id);
+    if (!coffeeId) return res.status(404).json({ error: 'Coffee not found.' });
+    const deleted = await coffees.deleteCoffee(pool, req.user.id, coffeeId);
+    return deleted ? res.status(204).end() : res.status(404).json({ error: 'Coffee not found.' });
+  } catch (error) {
+    return sendCoffeeError(res, error);
+  }
+});
+
 app.get('/api/brews', async (req, res) => {
   try {
     if (IS_STAGING && req.query.demo === '1') {
@@ -310,8 +507,29 @@ app.post('/api/brews', async (req, res) => {
     if (!recipe || recipe.id !== input.recipeId) {
       return res.status(400).json({ error: 'That recipe version is not available.' });
     }
+    let coffeeSnapshot = null;
+    if (input.coffeeId) {
+      const savedCoffee = await coffees.getCoffee(pool, req.user.id, input.coffeeId);
+      if (!savedCoffee) {
+        return res.status(400).json({ error: 'That saved coffee is not available.' });
+      }
+      coffeeSnapshot = {
+        id: savedCoffee.id,
+        name: savedCoffee.name,
+        roaster: savedCoffee.roaster,
+        origin: savedCoffee.origin,
+        variety: savedCoffee.variety,
+        process: savedCoffee.process,
+        roastLevel: savedCoffee.roastLevel,
+        roastDate: savedCoffee.roastDate,
+        tastingNotes: savedCoffee.tastingNotes,
+        purchaseDetails: savedCoffee.purchaseDetails,
+        favorite: savedCoffee.favorite,
+        status: savedCoffee.status,
+      };
+    }
     const snapshot = createRecipeSnapshot(recipe, input.coffee);
-    const entry = await journal.createEntry(pool, req.user, input, snapshot);
+    const entry = await journal.createEntry(pool, req.user, input, snapshot, coffeeSnapshot);
     const payload = { entry: (await entriesForClient(req.user.id, [entry]))[0] };
     if (req.headers['x-idempotency-key']) replayResults.set(key, payload);
     return res.status(201).json(applyReplayHeaders(req, res, payload));
@@ -805,6 +1023,7 @@ async function boot() {
     await journal.initializeJournal(pool);
     await collections.initializeCollections(pool);
     await personalRecipes.initializePersonalRecipes(pool);
+    await coffees.initializeCoffees(pool);
   } catch (error) {
     console.error(`Private data schema failed: ${error.message}`);
     process.exit(1);
