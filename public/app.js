@@ -2766,6 +2766,7 @@
       // stay quiet, so only clear the marker on the not-started transition.
       if (!state.timer.started) state.lastRenderedStep = null;
       state.timer.started = true;
+      closeCueSettings();
     }
     renderTimer();
   }

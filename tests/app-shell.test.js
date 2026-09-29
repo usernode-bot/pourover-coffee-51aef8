@@ -169,9 +169,11 @@ test('guided brewing shares one timeline and enters a protected mobile focus mod
   assert.match(source, /STEP_ACTIONS/);
   assert.match(source, /no scale reading/);
   assert.match(source, /document\.body\.classList\.toggle\('brew-focus', active\)/);
+  assert.match(source, /function toggleTimer\(\)[\s\S]*?closeCueSettings\(\)/);
   assert.match(source, /Exit this guided brew\? Your timer progress will be cleared\./);
   assert.match(source, /window\.addEventListener\('beforeunload'/);
   assert.match(styles, /\.brew-focus #app-header/);
+  assert.match(styles, /body\.brew-focus #cue-settings-toggle\s*\{\s*display:\s*none/);
   assert.match(styles, /100dvh/);
   assert.match(styles, /safe-area-inset-bottom/);
 });

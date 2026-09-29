@@ -1765,6 +1765,10 @@ textarea:focus-visible,
     padding: 0.9rem 0.85rem 1rem;
   }
 
+  body.brew-focus #cue-settings-toggle {
+    display: none;
+  }
+
   .brew-focus .timer-panel > .timer-ring {
     grid-column: 1;
     grid-row: 1;
