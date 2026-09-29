@@ -162,6 +162,7 @@ test('guided brewing shares one timeline and enters a protected mobile focus mod
   const source = read('public/app.js');
   const recipes = read('public/recipes.js');
   const styles = read('public/app.css');
+  const html = read('public/index.html');
 
   assert.match(recipes, /function getRecipeTimeline\(recipeOrId\)/);
   assert.match(source, /const timeline = getRecipeTimeline\(recipe\)/);
@@ -172,6 +173,10 @@ test('guided brewing shares one timeline and enters a protected mobile focus mod
   assert.match(source, /Exit this guided brew\? Your timer progress will be cleared\./);
   assert.match(source, /window\.addEventListener\('beforeunload'/);
   assert.match(styles, /\.brew-focus #app-header/);
+  assert.doesNotMatch(styles, /data-mode="exit-brew"/);
+  assert.doesNotMatch(source, /dataset\.mode = active \? 'exit-brew' : 'back'/);
+  assert.match(html, /id="exit-brew"/);
+  assert.match(source, /elements\.exitBrew\.addEventListener\('click'/);
   assert.match(styles, /100dvh/);
   assert.match(styles, /safe-area-inset-bottom/);
 });

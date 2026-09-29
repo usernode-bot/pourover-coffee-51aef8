@@ -151,6 +151,7 @@
     timerToggleIcon: document.getElementById('timer-toggle-icon'),
     timerToggleLabel: document.getElementById('timer-toggle-label'),
     resetTimer: document.getElementById('reset-timer'),
+    exitBrew: document.getElementById('exit-brew'),
     cueSettingsPanel: document.getElementById('cue-settings'),
     cueSettingsToggle: document.getElementById('cue-settings-toggle'),
     cueSettingsClose: document.getElementById('cue-settings-close'),
@@ -977,8 +978,6 @@
     const large = CUE_ENABLED && Boolean(state.cueSettings?.largeDisplay?.enabled);
     document.body.classList.toggle('brew-large', active && large);
     elements.timerPanel.dataset.focus = active ? 'active' : 'ready';
-    elements.back.dataset.mode = active ? 'exit-brew' : 'back';
-    elements.back.setAttribute('aria-label', active ? 'Exit guided brew' : 'Go back');
   }
 
   function abandonBrewProgress() {
@@ -3007,6 +3006,9 @@
   elements.previousStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex - 1));
   elements.nextStep.addEventListener('click', () => seekToStep(getBrewTiming(state.scaled, elapsedNow()).stepIndex + 1));
   elements.resetTimer.addEventListener('click', resetTimer);
+  elements.exitBrew.addEventListener('click', () => {
+    navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' });
+  });
   elements.cueSettingsToggle.addEventListener('click', () => {
     if (elements.cueSettingsPanel.hidden) openCueSettings();
     else closeCueSettings();
