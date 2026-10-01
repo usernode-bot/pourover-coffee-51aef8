@@ -307,6 +307,32 @@
         "public/**",
         "dapp.json"
       ]
+    },
+    {
+      "id": "nav.timer-screen-exit",
+      "name": "Timer screen hides the global nav and offers its own exit",
+      "path": "/?brew=v60-bright&shot=active",
+      "expectSelector": "#app-header[hidden]",
+      "expectText": "Guided brew",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
+    },
+    {
+      "id": "nav.mobile-tabbar",
+      "name": "Mobile navigation renders as a bottom tab bar",
+      "path": "/",
+      "expectSelector": "#app-tabbar .tabbar-item[data-tab=\"glossary\"]",
+      "expectText": "Glossary",
+      "visual": true,
+      "impact": [
+        "public/**",
+        "styles/**",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {

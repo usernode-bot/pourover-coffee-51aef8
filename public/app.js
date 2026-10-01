@@ -70,6 +70,8 @@
   };
 
   const elements = {
+    header: document.getElementById('app-header'),
+    tabbar: document.getElementById('app-tabbar'),
     back: document.getElementById('back-button'),
     home: document.getElementById('home-button'),
     myRecipesButton: document.getElementById('my-recipes-button'),
@@ -121,6 +123,7 @@
     stepCount: document.getElementById('step-count'),
     recipeSteps: document.getElementById('recipe-steps'),
     startBrew: document.getElementById('start-brew-button'),
+    brewExit: document.getElementById('brew-exit-button'),
     brewMethod: document.getElementById('brew-method'),
     brewTitle: document.getElementById('brew-title'),
     brewDose: document.getElementById('brew-dose'),
@@ -977,8 +980,6 @@
     const large = CUE_ENABLED && Boolean(state.cueSettings?.largeDisplay?.enabled);
     document.body.classList.toggle('brew-large', active && large);
     elements.timerPanel.dataset.focus = active ? 'active' : 'ready';
-    elements.back.dataset.mode = active ? 'exit-brew' : 'back';
-    elements.back.setAttribute('aria-label', active ? 'Exit guided brew' : 'Go back');
   }
 
   function abandonBrewProgress() {
@@ -994,6 +995,53 @@
     return leave;
   }
 
+  // window.confirm is suppressed inside the platform iframe, which used to
+  // make the exit control silently do nothing. Confirm in-app instead, with
+  // the native alert when the UI kit is present and window.confirm otherwise.
+  async function confirmBrewExitDialog() {
+    if (window.unNative?.alert) {
+      try {
+        const result = await window.unNative.alert({
+          title: 'Exit this guided brew?',
+          message: 'Your timer progress will be cleared.',
+          buttons: [
+            { label: 'Keep brewing', style: 'cancel' },
+            { label: 'Exit brew', style: 'destructive' },
+          ],
+        });
+        return result?.button?.label === 'Exit brew';
+      } catch (error) {
+        // Fall through to window.confirm.
+      }
+    }
+    return window.confirm('Exit this guided brew? Your timer progress will be cleared.');
+  }
+
+  // The gate every user-initiated exit from a running brew goes through:
+  // resolves false when the brewer chose to stay.
+  async function requestBrewExit() {
+    if (!isBrewInProgress()) return true;
+    const leave = await confirmBrewExitDialog();
+    if (leave) abandonBrewProgress();
+    return leave;
+  }
+
+  // Which bottom tab (mobile navigation) represents each screen. The timer
+  // screen hides both navigation surfaces entirely, so it maps to nothing.
+  const TAB_FOR_SCREEN = {
+    library: 'library',
+    method: 'library',
+    recipe: 'library',
+    myRecipes: 'my-recipes',
+    recipeForm: 'my-recipes',
+    shelf: 'shelf',
+    collection: 'shelf',
+    journal: 'journal',
+    journalDetail: 'journal',
+    journalForm: 'journal',
+    glossary: 'glossary',
+  };
+
   function showScreen(screen, { focus = true, transition = 'none' } = {}) {
     const mutate = () => {
       Object.entries(screens).forEach(([name, section]) => {
@@ -1002,6 +1050,18 @@
         section.dataset.active = String(active);
       });
       state.screen = screen;
+      // The timer screen is a focused mode: the global nav bar and the
+      // mobile tab bar both step aside, and the screen's own exit control
+      // takes over (see #41 and #42).
+      const timerScreen = screen === 'brew';
+      elements.header.hidden = timerScreen;
+      elements.tabbar.hidden = timerScreen;
+      elements.tabbar.querySelectorAll('.tabbar-item').forEach((item) => {
+        const active = item.dataset.tab === TAB_FOR_SCREEN[screen];
+        item.classList.toggle('is-active', active);
+        if (active) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+      });
       elements.back.hidden = screen === 'library';
       syncBrewFocus();
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -3211,11 +3271,35 @@
     else navigate('library', null, { transition: 'pop' });
   });
 
-  window.addEventListener('popstate', () => {
+  // The timer screen's own exit control (#42). It replaces the old exit pill
+  // in the global nav bar, which never appeared inside the platform iframe
+  // because window.confirm is suppressed there.
+  elements.brewExit.addEventListener('click', async () => {
+    if (!(await requestBrewExit())) return;
+    navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' });
+  });
+
+  // Mobile bottom tab bar (#43). Each tab triggers the same handler as its
+  // top-nav counterpart so the two navigations can never drift apart.
+  const tabTriggers = {
+    library: () => elements.home.click(),
+    'my-recipes': () => elements.myRecipesButton.click(),
+    shelf: () => elements.shelfButton.click(),
+    journal: () => elements.journalButton.click(),
+    glossary: () => elements.glossary.click(),
+    about: () => elements.about.click(),
+  };
+  elements.tabbar.addEventListener('click', (event) => {
+    const item = event.target.closest('[data-tab]');
+    if (!item) return;
+    tabTriggers[item.dataset.tab]?.();
+  });
+
+  window.addEventListener('popstate', async () => {
     if (isBrewInProgress()) {
       const brewUrl = urlFor('brew', recipeRouteReference(state.recipe));
       history.pushState({ screen: 'brew', id: recipeRouteReference(state.recipe) }, '', brewUrl);
-      if (!confirmBrewExit()) return;
+      if (!(await requestBrewExit())) return;
       history.back();
       return;
     }
