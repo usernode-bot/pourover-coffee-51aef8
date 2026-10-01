@@ -336,6 +336,7 @@
   };
 
   const DOSE_STORAGE_KEY = 'pourover-coffee:doses:v1';
+  const BREW_TIMER_STORAGE_KEY = 'pourover-coffee:brew-timer:v1';
   const FILTER_PARAM = Object.freeze({ method: 'filterMethod' });
   const APP_TOKEN = (() => {
     const urlToken = new URLSearchParams(window.location.search).get('token') || '';
@@ -429,6 +430,70 @@
     } catch {
       // Private browsing may decline storage. The current brew still works.
     }
+  }
+
+  function saveBrewTimer() {
+    try {
+      localStorage.setItem(BREW_TIMER_STORAGE_KEY, JSON.stringify({
+        recipe: recipeRouteReference(state.recipe),
+        elapsed: state.timer.elapsed,
+        anchorElapsed: state.timer.anchorElapsed,
+        anchorTime: state.timer.anchorTime,
+        running: state.timer.running,
+        started: state.timer.started,
+        completed: state.timer.completed,
+      }));
+    } catch {
+      // Private browsing may decline storage. The current brew still works.
+    }
+  }
+
+  function clearBrewTimer() {
+    try {
+      localStorage.removeItem(BREW_TIMER_STORAGE_KEY);
+    } catch {
+      // The in-memory timer already reflects the reset.
+    }
+  }
+
+  function restoreBrewTimer(reference) {
+    let saved = null;
+    try {
+      saved = JSON.parse(localStorage.getItem(BREW_TIMER_STORAGE_KEY) || 'null');
+    } catch {
+      saved = null;
+    }
+    const usable = saved && typeof saved === 'object'
+      && typeof saved.recipe === 'string' && saved.recipe
+      && Number.isFinite(saved.elapsed)
+      && Number.isFinite(saved.anchorElapsed)
+      && Number.isFinite(saved.anchorTime)
+      && typeof saved.running === 'boolean'
+      && typeof saved.started === 'boolean'
+      && typeof saved.completed === 'boolean';
+    if (!usable) {
+      clearBrewTimer();
+      return false;
+    }
+    const startedOrDone = saved.started || saved.completed;
+    if (!startedOrDone || !findRecipe(saved.recipe)) {
+      clearBrewTimer();
+      return false;
+    }
+    chooseRecipe(saved.recipe);
+    state.timer = {
+      elapsed: saved.elapsed,
+      anchorElapsed: saved.anchorElapsed,
+      anchorTime: saved.anchorTime,
+      running: saved.running,
+      started: saved.started,
+      completed: saved.completed,
+    };
+    if (!saved.running) {
+      state.timer.elapsed = saved.elapsed;
+      state.timer.anchorElapsed = saved.elapsed;
+    }
+    return true;
   }
 
   function initCueRunner() {
@@ -985,6 +1050,7 @@
   function abandonBrewProgress() {
     cancelTimerTick();
     state.timer = freshTimer();
+    clearBrewTimer();
     syncBrewFocus();
   }
 
@@ -1279,7 +1345,13 @@
     }
     if (brewId && isKnownRecipeReference(brewId)) {
       chooseRecipe(brewId);
-      state.timer = freshTimer();
+      let restored = false;
+      if (shot !== 'active' && shot !== 'large' && shot !== 'cues') {
+        restored = restoreBrewTimer(brewId);
+        if (!restored) state.timer = freshTimer();
+      } else {
+        state.timer = freshTimer();
+      }
       if (shot === 'active' || shot === 'large' || shot === 'cues') {
         state.scaled = scaleRecipe(state.recipe, state.recipe.defaultCoffee);
         state.timer.elapsed = Math.min(state.scaled.totalDuration - 1, state.scaled.steps[0].duration + 25);
@@ -2642,6 +2714,7 @@
     state.doses[recipe.id] = entry.recipeSnapshot.coffee;
     saveDoses();
     state.timer = freshTimer();
+    saveBrewTimer();
     navigate('brew', recipeRouteReference(recipe), { transition: 'push' });
   }
 
@@ -2738,6 +2811,7 @@
       state.timer.elapsed = state.scaled.totalDuration;
       state.timer.running = false;
       state.timer.completed = true;
+      saveBrewTimer();
       state.cueRunner?.fire('complete', { stepIndex: 'complete' });
     }
     elements.timerPanel.hidden = state.timer.completed;
@@ -2827,6 +2901,7 @@
       if (!state.timer.started) state.lastRenderedStep = null;
       state.timer.started = true;
     }
+    saveBrewTimer();
     renderTimer();
   }
 
@@ -2837,6 +2912,7 @@
       state.timer.running = false;
       state.timer.started = true;
       state.timer.completed = true;
+      saveBrewTimer();
       renderTimer();
       return;
     }
@@ -2851,6 +2927,7 @@
     state.lastPreparationHapticStep = -1;
     state.cueRunner?.cancel();
     elements.timerAnnouncement.textContent = '';
+    saveBrewTimer();
     renderTimer();
   }
 
@@ -2859,6 +2936,7 @@
     state.timer = freshTimer();
     state.lastAnnouncedStep = -1;
     state.cueRunner?.cancel();
+    clearBrewTimer();
     renderBrewShell();
   }
 
@@ -2984,6 +3062,7 @@
   });
   elements.startBrew.addEventListener('click', () => {
     state.timer = freshTimer();
+    saveBrewTimer();
     initCueRunner();
     navigate('brew', recipeRouteReference(state.recipe), { transition: 'push' });
   });

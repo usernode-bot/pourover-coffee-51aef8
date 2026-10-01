@@ -276,6 +276,41 @@ test('the timer keeps its step label button alive across ticks', () => {
   assert.match(source, /if \(!state\.timer\.started\) state\.lastRenderedStep = null;/);
 });
 
+test('the brew timer survives a page reload through localStorage', () => {
+  const source = read('public/app.js');
+
+  // A saved timer lives under its own key next to the dose preferences and
+  // stores the recipe reference with the raw timer fields.
+  assert.match(source, /const BREW_TIMER_STORAGE_KEY = 'pourover-coffee:brew-timer:v1';/);
+  assert.match(source, /function saveBrewTimer\(\)/);
+  assert.match(source, /function clearBrewTimer\(\)/);
+  assert.match(source, /function restoreBrewTimer\(reference\)/);
+  assert.match(source, /recipeRouteReference\(state\.recipe\)/);
+
+  // Every timer mutation is mirrored to storage; intentional resets clear it.
+  assert.match(source, /function toggleTimer\(\) \{[\s\S]*?saveBrewTimer\(\);\n    renderTimer\(\);\n  \}/);
+  assert.match(source, /function seekToStep\(index\) \{[\s\S]*?saveBrewTimer\(\);\n    renderTimer\(\);\n  \}/);
+  assert.match(source, /state\.timer\.completed = true;\n      saveBrewTimer\(\);/);
+  assert.match(source, /function resetTimer\(\) \{[\s\S]*?clearBrewTimer\(\);[\s\S]*?renderBrewShell\(\);\n  \}/);
+  assert.match(source, /function abandonBrewProgress\(\) \{[\s\S]*?clearBrewTimer\(\);[\s\S]*?syncBrewFocus\(\);\n  \}/);
+  const newBrewEntries = source.match(/state\.timer = freshTimer\(\);\n    saveBrewTimer\(\);/g) || [];
+  assert.ok(newBrewEntries.length >= 2, 'new-brew entry points save the fresh timer');
+
+  // Startup restores an in-progress brew from storage before the fresh-timer
+  // reset runs, and the demo capture shots still override the restore.
+  const restoreHook = source.match(/if \(brewId && isKnownRecipeReference\(brewId\)\) \{\n([\s\S]*?)\n    \}\n    if \(recipeId/);
+  assert.ok(restoreHook, 'the brew route still exists');
+  assert.match(restoreHook[1], /if \(shot !== 'active' && shot !== 'large' && shot !== 'cues'\) \{\n        restored = restoreBrewTimer\(brewId\);\n        if \(!restored\) state\.timer = freshTimer\(\);\n      \}/);
+  const order = restoreHook[1].indexOf('restoreBrewTimer(brewId)');
+  const reset = restoreHook[1].indexOf('state.timer = freshTimer()');
+  assert.ok(order !== -1 && reset !== -1 && order < reset, 'restore runs before the fresh-timer reset');
+
+  // Restoring re-anchors a running timer from the saved wall-clock fields and
+  // puts a paused timer back at its saved elapsed without touching the anchor.
+  assert.match(source, /state\.timer = \{\n      elapsed: saved\.elapsed,\n      anchorElapsed: saved\.anchorElapsed,\n      anchorTime: saved\.anchorTime,\n      running: saved\.running,\n      started: saved\.started,\n      completed: saved\.completed,\n    \};/);
+  assert.match(source, /if \(!saved\.running\) \{\n      state\.timer\.elapsed = saved\.elapsed;\n      state\.timer\.anchorElapsed = saved\.elapsed;\n    \}/);
+});
+
 test('user-facing product files contain no em dash encoding', () => {
   for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'public/adjustments.js', 'server.js', 'journal-store.js', 'personal-recipe-store.js', 'dapp.json']) {
     const source = read(file);
