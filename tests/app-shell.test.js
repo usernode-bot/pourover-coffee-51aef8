@@ -52,6 +52,8 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?recipeEditor=new&source=v60-bright&demo=1',
     '/?brew=personal-00000000-0000-4000-8000-000000000013&shot=active&demo=1',
     '/?offline=shot',
+    '/?brew=v60-bright&shot=active',
+    '/',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'recipe.timeline');
@@ -89,6 +91,10 @@ test('the manifest declares navigable checks for each product screen', () => {
   assert.ok(manifest.tests.slice(24, 28).every((entry) => entry.visual));
   assert.equal(manifest.tests[28].id, 'offline.sync-status');
   assert.equal(manifest.tests[28].expectText, 'Sync status');
+  assert.equal(manifest.tests[29].id, 'nav.timer-screen-exit');
+  assert.equal(manifest.tests[29].expectSelector, '#app-header[hidden]');
+  assert.equal(manifest.tests[30].id, 'nav.mobile-tabbar');
+  assert.ok(manifest.tests.slice(29, 31).every((entry) => entry.visual));
 });
 
 test('private recipe screens expose creation, lineage, revision, and lifecycle controls', () => {
@@ -128,6 +134,28 @@ test('the manifest declares visual checks for the shelf screens', () => {
   const paths = manifest.tests.map((entry) => entry.path);
   assert.ok(paths.includes('/?favorites=1&demo=1'));
   assert.ok(paths.includes('/?recipe=v60-bright&shot=picker&demo=1'));
+});
+
+test('the timer screen exits through its own control and mobile nav moves to a tab bar', () => {
+  const html = read('public/index.html');
+  const client = read('public/app.js');
+  const styles = read('public/app.css');
+
+  // The global nav bar no longer renders on the timer screen (#41); the
+  // screen carries its own exit control (#42) whose confirmation works
+  // inside the platform iframe, and small screens navigate from a bottom
+  // tab bar (#43) while desktop keeps the top nav.
+  assert.match(html, /id="brew-exit-button"[^>]+aria-label="Exit guided brew"/);
+  assert.match(html, /id="app-tabbar"/);
+  assert.match(client, /elements\.header\.hidden = timerScreen/);
+  assert.match(client, /elements\.tabbar\.hidden = timerScreen/);
+  assert.match(client, /confirmBrewExitDialog/);
+  assert.match(client, /requestBrewExit/);
+  assert.doesNotMatch(client, /elements\.back\.dataset\.mode/);
+  assert.doesNotMatch(styles, /data-mode="exit-brew"/);
+  assert.match(styles, /\.brew-focus #brew-screen > \.mx-auto > \.flex:first-child \.brew-meta/);
+  assert.match(styles, /\.app-tabbar/);
+  assert.match(styles, /@media \(min-width: 640px\)/);
 });
 
 test('the shell has separate method, discovery, detail, and brew surfaces', () => {
@@ -171,7 +199,8 @@ test('guided brewing shares one timeline and enters a protected mobile focus mod
   assert.match(source, /document\.body\.classList\.toggle\('brew-focus', active\)/);
   assert.match(source, /Exit this guided brew\? Your timer progress will be cleared\./);
   assert.match(source, /window\.addEventListener\('beforeunload'/);
-  assert.match(styles, /\.brew-focus #app-header/);
+  // The timer screen hides the global nav bar instead of restyling it (#41).
+  assert.doesNotMatch(styles, /\.brew-focus #app-header/);
   assert.match(styles, /100dvh/);
   assert.match(styles, /safe-area-inset-bottom/);
 });

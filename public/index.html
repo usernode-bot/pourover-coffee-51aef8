@@ -572,9 +572,14 @@
               <h1 id="brew-title" tabindex="-1" class="mt-1 text-2xl font-semibold tracking-tight">Guided brew</h1>
               <p class="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-[#9a8473]">Guided brew</p>
             </div>
-            <div class="text-right">
-              <p id="brew-dose" class="text-sm font-semibold"></p>
-              <p id="brew-ratio" class="text-xs text-[#8c7767]"></p>
+            <div class="flex shrink-0 items-start gap-2">
+              <div class="brew-meta text-right">
+                <p id="brew-dose" class="text-sm font-semibold"></p>
+                <p id="brew-ratio" class="text-xs text-[#8c7767]"></p>
+              </div>
+              <button id="brew-exit-button" class="secondary-icon-button un-touch-target" type="button" aria-label="Exit guided brew">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              </button>
             </div>
           </div>
 
@@ -911,6 +916,33 @@
       Brew slowly. Taste curiously.
     </footer>
   </div>
+
+  <nav id="app-tabbar" class="app-tabbar" aria-label="Primary">
+    <button class="tabbar-item" data-tab="library" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m16 6 4 14"/><path d="M12 6v14"/><path d="M8 8v12"/><path d="M4 4v16"/></svg>
+      <span>Library</span>
+    </button>
+    <button class="tabbar-item" data-tab="my-recipes" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>
+      <span>My recipes</span>
+    </button>
+    <button class="tabbar-item" data-tab="shelf" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>My shelf</span>
+    </button>
+    <button class="tabbar-item" data-tab="journal" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      <span>Journal</span>
+    </button>
+    <button class="tabbar-item" data-tab="glossary" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+      <span>Glossary</span>
+    </button>
+    <button class="tabbar-item" data-tab="about" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span>About</span>
+    </button>
+  </nav>
 
   <div id="term-panel" class="term-panel" role="dialog" aria-modal="true" aria-labelledby="term-panel-title" hidden>
     <button id="term-panel-backdrop" class="term-panel-backdrop" type="button" tabindex="-1" aria-label="Close definition"></button>
