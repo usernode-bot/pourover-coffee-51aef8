@@ -2712,3 +2712,23 @@ body.brew-large .cue-select select {
   color: #fff6ea;
   border-color: #57402c;
 }
+
+/* A bounded guide keeps Close visible while its article scrolls on short phones. */
+.water-guide-button { text-decoration: underline; text-underline-offset: 4px; }
+.water-guide-modal {
+  width: min(38rem, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  overflow: hidden;
+  background: #fbf7f0;
+}
+.water-guide-card { display: flex; flex-direction: column; max-height: calc(100dvh - 2rem); }
+.water-guide-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; border-bottom: 1px solid #d9cdbc; flex-shrink: 0; }
+.water-guide-header h2 { margin-top: .4rem; font-size: 1.5rem; font-weight: 650; letter-spacing: -.035em; }
+.water-guide-body { overflow-y: auto; overscroll-behavior: contain; padding: 1.25rem; padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); font-size: .9375rem; line-height: 1.65; color: #66564a; }
+.water-guide-body section { margin-top: 1.5rem; }
+.water-guide-body h3 { font-size: 1rem; font-weight: 650; color: #2c211a; }
+.water-guide-body p, .water-guide-body ul { margin-top: .6rem; }
+.water-guide-body ul { padding-left: 1.25rem; list-style: disc; }
+.water-guide-body li + li { margin-top: .75rem; }
+.water-guide-sources a { text-decoration: underline; text-underline-offset: 3px; }

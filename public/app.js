@@ -2930,6 +2930,37 @@
     announceCueStatus(`Previewing ${cueEventLabel(event).toLowerCase()} cue`);
   }
 
+  let waterGuideOpen = false;
+
+  function openWaterGuide() {
+    if (waterGuideOpen) return;
+    waterGuideOpen = true;
+    const opener = document.getElementById('water-guide-button');
+    const content = document.getElementById('water-guide-content').content.firstElementChild.cloneNode(true);
+    const restoreFocus = () => {
+      waterGuideOpen = false;
+      opener.focus({ preventScroll: true });
+    };
+    if (window.unNative?.presentModal) {
+      const modal = window.unNative.presentModal({ contentEl: content, onDismiss: restoreFocus });
+      modal.el.classList.add('water-guide-modal');
+      modal.el.setAttribute('aria-labelledby', 'water-guide-title');
+      content.querySelector('[data-close-water-guide]').addEventListener('click', () => modal.dismiss());
+      return;
+    }
+    const dialog = document.createElement('dialog');
+    dialog.className = 'about-dialog water-guide-modal';
+    dialog.setAttribute('aria-labelledby', 'water-guide-title');
+    dialog.append(content);
+    document.body.append(dialog);
+    content.querySelector('[data-close-water-guide]').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      restoreFocus();
+    }, { once: true });
+    dialog.showModal();
+  }
+
   function openAbout() {
     const content = document.getElementById('about-content').content.firstElementChild.cloneNode(true);
     if (window.unNative?.presentModal) {
@@ -3203,6 +3234,7 @@
       openJournal({ historyMode: 'replaceState', transition: 'pop' });
     }
   });
+  document.getElementById('water-guide-button').addEventListener('click', openWaterGuide);
   elements.about.addEventListener('click', openAbout);
   elements.glossary.addEventListener('click', openGlossary);
   elements.glossarySearch.addEventListener('input', () => {
