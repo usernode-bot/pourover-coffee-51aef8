@@ -346,9 +346,12 @@
       || '';
   })();
   const CUE_ENABLED = typeof CUE_EVENTS !== 'undefined' && Boolean(createCueRunner);
-  const activeBrewStore = window.PouroverActiveBrew.createStore(
-    window.PouroverActiveBrew.ownerFromToken(APP_TOKEN)
-  );
+  const APP_OWNER = window.PouroverActiveBrew?.ownerFromToken(APP_TOKEN);
+  // Older cached documents do not load the persistence module. Keep the
+  // library, navigation and same-document timer usable during that upgrade.
+  const activeBrewStore = window.PouroverActiveBrew
+    ? window.PouroverActiveBrew.createStore(APP_OWNER)
+    : { read: () => null, save: () => false, clear: () => {} };
 
   const state = {
     screen: 'library',
@@ -477,16 +480,36 @@
   }
 
   async function apiFetch(path, options = {}) {
+    const read = !options.method || options.method === 'GET';
+    const prefix = APP_OWNER ? `pourover-coffee:api-reads:v1:${APP_OWNER}:` : null;
+    const key = prefix && read ? `${prefix}${path}` : null;
     const headers = {
       Accept: 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
       ...(APP_TOKEN ? { 'x-usernode-token': APP_TOKEN } : {}),
       ...(options.headers || {}),
     };
-    const response = await fetch(path, { ...options, headers });
+    let response;
+    try {
+      response = await fetch(path, { ...options, headers });
+    } catch (error) {
+      // Preserve previously loaded private recipes offline in this account's
+      // own storage, rather than an account-blind service-worker API cache.
+      try {
+        const cached = key && localStorage.getItem(key);
+        if (cached) return JSON.parse(cached);
+      } catch { /* unavailable or corrupt storage */ }
+      throw error;
+    }
     if (response.status === 204) return null;
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'That request could not be completed.');
+    try {
+      if (key) {
+        const serialized = JSON.stringify(payload);
+        if (serialized.length <= 262_144) localStorage.setItem(key, serialized);
+      }
+    } catch { /* storage may be full or denied */ }
     return payload;
   }
 
@@ -2666,7 +2689,9 @@
   }
 
   function elapsedNow() {
-    return window.PouroverActiveBrew.elapsedSeconds(state.timer);
+    return state.timer.running
+      ? state.timer.anchorElapsed + Math.max(0, Date.now() - state.timer.anchorTime) / 1000
+      : state.timer.elapsed;
   }
 
   function isBrewPreview() {
@@ -3292,7 +3317,7 @@
       openJournal({ historyMode: 'replaceState', transition: 'pop' });
     }
   });
-  document.getElementById('water-guide-button').addEventListener('click', openWaterGuide);
+  document.getElementById('water-guide-button')?.addEventListener('click', openWaterGuide);
   elements.about.addEventListener('click', openAbout);
   elements.glossary.addEventListener('click', openGlossary);
   elements.glossarySearch.addEventListener('input', () => {
@@ -3561,6 +3586,15 @@
     // must not hold up a clock whose recipe is already saved on this device.
     const restored = restoreActiveBrew(params);
     if (restored) populateJournalControls();
+    // Original recipes need no private API. Private revision deep links wait
+    // for their data, while the library remains available underneath.
+    const privateRoute = ['recipe', 'brew', 'source'].some((key) =>
+      params.get(key)?.startsWith('personal-'));
+    if (!restored) {
+      renderLibrary();
+      if (!privateRoute) parseLocation();
+    }
+    const initialUrl = window.location.href;
     await loadPersonalRecipes({ demo, quiet: true });
     if (restored) { loadShelf({ quiet: true }); return; }
     await Promise.all([
@@ -3570,6 +3604,9 @@
     ]);
     populateJournalControls();
     loadShelf({ quiet: true });
-    parseLocation();
+    // A late response must not reset a running timer or move someone back
+    // after they have used the tabs while the request was pending.
+    if (privateRoute && window.location.href === initialUrl) parseLocation();
+    else if (state.screen === 'library') renderLibrary();
   })();
 })();

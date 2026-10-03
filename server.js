@@ -2,6 +2,7 @@
 
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const {
@@ -752,7 +753,21 @@ app.patch('/api/collections/:id/order', async (req, res) => {
 });
 
 app.get('/favicon.ico', (_req, res) => res.status(204).end());
+const builtShell = path.join(__dirname, 'public', 'build');
+const hasBuiltShell = fs.existsSync(path.join(builtShell, 'index.html'));
+const shellHtml = path.join(__dirname, 'public', hasBuiltShell ? 'build/index.html' : 'index.html');
+app.get('/sw.js', (_req, res) => {
+  res.set('Cache-Control', 'no-cache, must-revalidate');
+  // A source-only local checkout works online until npm run build is run.
+  if (!hasBuiltShell) return res.status(503).send('Build the offline shell first.');
+  return res.sendFile(path.join(builtShell, 'sw.js'));
+});
+app.get('/index.html', (_req, res) => {
+  res.set('Cache-Control', 'no-cache, must-revalidate');
+  return res.sendFile(shellHtml);
+});
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.get(/\.(?:js|css)$/, (_req, res) => res.sendStatus(404));
 
 app.get('*', (req, res) => {
   if (!req.user) {
@@ -771,7 +786,8 @@ app.get('*', (req, res) => {
   </div>
 </body>`);
   }
-  return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.set('Cache-Control', 'no-cache, must-revalidate');
+  return res.sendFile(shellHtml);
 });
 
 async function shutdown(signal) {

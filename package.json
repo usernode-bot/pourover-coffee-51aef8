@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "npm run build:css",
+    "build": "npm run build:css && node scripts/build-shell.js",
     "build:css": "tailwindcss -c tailwind.config.js -i styles/tailwind-input.css -o public/tailwind.css --minify",
     "test": "node --test tests/*.test.js"
   },

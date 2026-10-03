@@ -13,6 +13,7 @@ RUN npm ci --include=dev
 COPY tailwind.config.js ./
 COPY styles ./styles
 COPY public ./public
+COPY scripts ./scripts
 RUN npm run build
 
 # Stage 2 — the app itself (unchanged apart from the one COPY at the end).
@@ -24,6 +25,7 @@ COPY --chown=1000:1000 . .
 # After the source copy so the compiled stylesheet is not overwritten by the
 # source tree (which deliberately does not contain one).
 COPY --chown=1000:1000 --from=css /build/public/tailwind.css ./public/tailwind.css
+COPY --chown=1000:1000 --from=css /build/public/build ./public/build
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
