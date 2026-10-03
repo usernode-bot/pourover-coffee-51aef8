@@ -202,7 +202,7 @@
               <p class="mt-1 text-sm leading-6 text-[#756456]">If the cup tastes sharp, grind a little finer. If it tastes dry or bitter, grind a little coarser.</p>
             </div>
           </div>
-          <p class="mt-4 shrink-0 text-xs font-medium uppercase tracking-[0.16em] text-[#9b826e] sm:mt-0">Water matters too</p>
+          <button id="water-guide-button" class="outline-button water-guide-button mt-4 shrink-0 sm:mt-0" type="button" aria-haspopup="dialog">Water matters too <span aria-hidden="true">→</span></button>
         </aside>
       </section>
 
@@ -990,6 +990,48 @@
       <button id="collection-picker-done" class="outline-button mt-4 w-full justify-center" type="button">Done</button>
     </div>
   </div>
+
+  <template id="water-guide-content">
+    <article class="water-guide-card text-[#2c211a]">
+      <header class="water-guide-header">
+        <div>
+          <p class="eyebrow">A better starting point</p>
+          <h2 id="water-guide-title" tabindex="-1" autofocus>Water matters too</h2>
+        </div>
+        <button class="outline-button" type="button" data-close-water-guide aria-label="Close water guide">Close</button>
+      </header>
+      <div class="water-guide-body">
+        <p>Your water is an ingredient. Start with drinking water that tastes pleasant on its own, then try one small change.</p>
+        <section aria-labelledby="water-minerals-title">
+          <h3 id="water-minerals-title">What changes the cup?</h3>
+          <p><strong>Hardness</strong> measures calcium and magnesium. These minerals help extract flavor; different amounts can change the cup.</p>
+          <p><strong>Alkalinity</strong> buffers coffee’s acids. Too much can mute brightness and leave a flat cup; very little can let acidity stand out. It is different from hardness and pH.</p>
+          <p>A TDS reading measures total dissolved solids, not which minerals are present. It cannot tell you the whole story.</p>
+        </section>
+        <section aria-labelledby="water-options-title">
+          <h3 id="water-options-title">Choose an easy next step</h3>
+          <ul>
+            <li><strong>Tap water:</strong> if it tastes good and your coffee does too, keep using it. Check your supplier’s water report for hardness and alkalinity.</li>
+            <li><strong>Chlorine or odors:</strong> try a drinking-water carbon filter rated for them. A basic carbon filter does not necessarily reduce hardness; check its specification.</li>
+            <li><strong>Persistent flat cups or heavy scale:</strong> compare with still bottled drinking water with a lower mineral content. Bottles vary, so read the label.</li>
+            <li><strong>Distilled or reverse-osmosis water:</strong> use a brewing-water mineral blend according to its directions rather than guessing salt amounts. Plain mineral-free water is a different starting point.</li>
+          </ul>
+        </section>
+        <section aria-labelledby="water-experiment-title">
+          <h3 id="water-experiment-title">Try two brews, change only the water</h3>
+          <p>Keep the beans, dose, grind, ratio, temperature, and pouring the same. Compare both cups as they cool. Note the water used, sweetness, acidity, and finish in your brew journal. Keep the one you prefer; water is one possible cause, not a diagnosis for every sour or bitter cup.</p>
+        </section>
+        <section aria-labelledby="water-sources-title">
+          <h3 id="water-sources-title">Read a little further</h3>
+          <p>The guide stays available offline. These references need a connection:</p>
+          <ul class="water-guide-sources">
+            <li><a href="https://www.baristahustle.com/water-hardness/" target="_blank" rel="noopener noreferrer">Barista Hustle: water hardness (opens a new tab)</a></li>
+            <li><a href="https://www.baristahustle.com/diy-water-recipes-redux/" target="_blank" rel="noopener noreferrer">Barista Hustle: brewing-water recipes (opens a new tab)</a></li>
+          </ul>
+        </section>
+      </div>
+    </article>
+  </template>
 
   <template id="about-content">
     <div class="about-card p-6 text-[#2c211a]">
