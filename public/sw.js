@@ -2,12 +2,13 @@
 // a previously visited device can open the app and brew in airplane mode.
 'use strict';
 
-const CACHE_NAME = 'pourover-coffee-shell-v1';
+const CACHE_NAME = 'pourover-coffee-shell-v2';
 const SHELL_ASSETS = [
   '/',
   '/index.html',
   '/app.css',
   '/app.js',
+  '/active-brew.js',
   '/recipes.js',
   '/glossary.js',
   '/adjustments.js',
