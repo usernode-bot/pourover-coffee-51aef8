@@ -346,6 +346,9 @@
       || '';
   })();
   const CUE_ENABLED = typeof CUE_EVENTS !== 'undefined' && Boolean(createCueRunner);
+  const activeBrewStore = window.PouroverActiveBrew.createStore(
+    window.PouroverActiveBrew.ownerFromToken(APP_TOKEN)
+  );
 
   const state = {
     screen: 'library',
@@ -984,6 +987,7 @@
 
   function abandonBrewProgress() {
     cancelTimerTick();
+    clearActiveBrew();
     state.timer = freshTimer();
     syncBrewFocus();
   }
@@ -2641,7 +2645,7 @@
     if (!recipe) return;
     state.doses[recipe.id] = entry.recipeSnapshot.coffee;
     saveDoses();
-    state.timer = freshTimer();
+    abandonBrewProgress();
     navigate('brew', recipeRouteReference(recipe), { transition: 'push' });
   }
 
@@ -2662,15 +2666,64 @@
   }
 
   function elapsedNow() {
-    if (!state.timer.running) return state.timer.elapsed;
-    return state.timer.anchorElapsed + (Date.now() - state.timer.anchorTime) / 1000;
+    return window.PouroverActiveBrew.elapsedSeconds(state.timer);
+  }
+
+  function isBrewPreview() {
+    // Demo/check routes must neither overwrite nor clear a real saved brew.
+    const params = new URLSearchParams(window.location.search);
+    return params.has('shot') || params.get('demo') === '1' || params.get('journal') === 'demo';
+  }
+
+  function clearActiveBrew() {
+    if (!isBrewPreview()) activeBrewStore.clear();
+  }
+
+  function persistActiveBrew() {
+    if (isBrewPreview()) return;
+    activeBrewStore.save(state.recipe, state.scaled.coffee, state.timer);
+  }
+
+  function restoreActiveBrew(params) {
+    if (params.has('shot') || params.get('demo') === '1' || params.get('journal') === 'demo') return false;
+    // Explicit links to another screen still open that screen. A plain app
+    // launch or a reload of this brew restores the interrupted cup.
+    if (['recipe', 'method', 'journal', 'myRecipes', 'recipeEditor', 'shelf', 'collection', 'glossary']
+      .some((key) => params.has(key))) return false;
+    const saved = activeBrewStore.read();
+    if (!saved) return false;
+    const requested = params.get('brew');
+    if (requested && ![saved.recipe.id, saved.recipe.revisionId,
+      METHODS.find((method) => method.defaultRecipeId === saved.recipe.id)?.id].includes(requested)) return false;
+    if (saved.recipe.isPersonal) {
+      state.personal.historical = [saved.recipe, ...state.personal.historical.filter((recipe) => recipe.revisionId !== saved.recipe.revisionId)];
+    }
+    state.recipe = saved.recipe;
+    state.method = getMethod(saved.recipe.methodId);
+    state.scaled = scaleRecipe(saved.recipe, saved.coffee);
+    state.timer = saved.timer;
+    applyTheme(state.method);
+    renderRecipe();
+    history.replaceState({ screen: 'brew', id: saved.recipe.revisionId }, '', urlFor('brew', saved.recipe.revisionId));
+    showScreen('brew', { focus: false, transition: 'none' });
+    initCueRunner();
+    renderBrewShell();
+    return true;
+  }
+
+  function resumeBrewRendering() {
+    if (state.screen === 'brew' && state.timer.started) renderTimer();
   }
 
   // The brew clock is anchored to wall-clock time, so it stays accurate in a
   // background tab or when the device sleeps; a visibility change just forces
   // the delayed render to catch up immediately.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && state.timer.running) renderTimer();
+    if (document.visibilityState === 'visible') resumeBrewRendering();
+  });
+  window.addEventListener('pageshow', resumeBrewRendering);
+  window.addEventListener('usernode:visibility-changed', (event) => {
+    if (!event.detail?.hidden) resumeBrewRendering();
   });
 
   function renderBrewShell() {
@@ -2738,6 +2791,7 @@
       state.timer.elapsed = state.scaled.totalDuration;
       state.timer.running = false;
       state.timer.completed = true;
+      clearActiveBrew();
       state.cueRunner?.fire('complete', { stepIndex: 'complete' });
     }
     elements.timerPanel.hidden = state.timer.completed;
@@ -2827,6 +2881,7 @@
       if (!state.timer.started) state.lastRenderedStep = null;
       state.timer.started = true;
     }
+    persistActiveBrew();
     renderTimer();
   }
 
@@ -2837,6 +2892,7 @@
       state.timer.running = false;
       state.timer.started = true;
       state.timer.completed = true;
+      persistActiveBrew();
       renderTimer();
       return;
     }
@@ -2851,11 +2907,13 @@
     state.lastPreparationHapticStep = -1;
     state.cueRunner?.cancel();
     elements.timerAnnouncement.textContent = '';
+    persistActiveBrew();
     renderTimer();
   }
 
   function resetTimer() {
     cancelTimerTick();
+    clearActiveBrew();
     state.timer = freshTimer();
     state.lastAnnouncedStep = -1;
     state.cueRunner?.cancel();
@@ -2983,7 +3041,7 @@
     }
   });
   elements.startBrew.addEventListener('click', () => {
-    state.timer = freshTimer();
+    abandonBrewProgress();
     initCueRunner();
     navigate('brew', recipeRouteReference(state.recipe), { transition: 'push' });
   });
@@ -3467,7 +3525,12 @@
   (async function initializePrivateRecipes() {
     const params = new URLSearchParams(window.location.search);
     const demo = params.get('demo') === '1';
+    // Restore before awaiting any private-data request. A slow connection
+    // must not hold up a clock whose recipe is already saved on this device.
+    const restored = restoreActiveBrew(params);
+    if (restored) populateJournalControls();
     await loadPersonalRecipes({ demo, quiet: true });
+    if (restored) { loadShelf({ quiet: true }); return; }
     await Promise.all([
       loadPersonalRevision(params.get('recipe')),
       loadPersonalRevision(params.get('brew')),

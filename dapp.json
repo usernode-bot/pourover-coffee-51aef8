@@ -38,10 +38,10 @@
     },
     {
       "id": "brew.guided-timer",
-      "name": "Guided timer renders an active brew",
+      "name": "Guided timer renders its active brew and clock state",
       "path": "/?brew=v60-bright&shot=active",
       "expectText": "Now",
-      "expectSelector": "body.brew-focus #timer-panel[data-focus=\"active\"]",
+      "expectSelector": "body.brew-focus #timer-panel[data-focus=\"active\"][data-timer-state=\"paused\"]",
       "visual": true,
       "impact": [
         "public/**",
