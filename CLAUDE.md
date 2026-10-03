@@ -108,3 +108,12 @@ Chemex, and AeroPress.
   unsupported inputs as a reason to ask for a dominant symptom rather than
   guessing. Recommendations never mutate a journal entry or recipe until the
   brewer explicitly saves through the existing controls.
+- `npm run build` compiles CSS and then generates `public/build/`: HTML with
+  content-fingerprinted local assets and a hash-verified service-worker shell.
+  Docker copies this directory into the runtime image. Do not commit these
+  generated files or refresh cached shell assets independently. The worker's
+  release changes automatically when shell content or worker logic changes.
+  API traffic must pass through the worker to the network; private offline
+  mutation queues, account-scoped read caches and active brews remain in the
+  app's own device storage. Read caches fall back only on network failure,
+  never on an HTTP refusal from the server.

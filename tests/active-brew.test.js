@@ -110,10 +110,11 @@ test('denied storage and missing identity leave the current timer usable', () =>
 // Exercise the real app, markup and event handlers in a new DOM each time.
 // Advancing the clock with no callbacks models a suspended/recreated document;
 // it does not claim to reproduce any particular phone's lifecycle trigger.
-async function app({ device = storage(), at = START, route = '/', user = 6, pendingNetwork = false, personalRecipes = [] } = {}) {
+async function app({ device = storage(), at = START, route = '/', user = 6, pendingNetwork = false, personalRecipes = [], omitActiveBrew = false, legacyMarkup = false, delayedNetwork = false, networkFailure = false, httpStatus = 200 } = {}) {
   let now = at;
   const separator = route.includes('?') ? '&' : '?';
-  const dom = new JSDOM(read('public/index.html'), {
+  const markup = legacyMarkup ? read('public/index.html').replace(/id="water-guide-button"/, '') : read('public/index.html');
+  const dom = new JSDOM(markup, {
     url: `https://pourover.example${route}${user === null ? '' : `${separator}token=${tokenFor(user)}`}`,
     runScripts: 'outside-only',
     pretendToBeVisual: true,
@@ -123,19 +124,29 @@ async function app({ device = storage(), at = START, route = '/', user = 6, pend
   win.Date.now = () => now;
   win.scrollTo = () => {};
   win.confirm = () => true;
+  const pending = [];
+  let delay = delayedNetwork;
   win.fetch = async (url) => {
+    if (networkFailure) throw new Error('offline');
     if (pendingNetwork) return new Promise(() => {});
     const body = url.startsWith('/api/personal-recipes')
       ? { recipes: personalRecipes }
       : { favorites: [], collections: [], recentlyBrewed: [], entries: [] };
-    return { ok: true, status: 200, json: async () => body };
+    const response = { ok: httpStatus < 400, status: httpStatus, json: async () => body };
+    if (delay) return new Promise((resolve) => pending.push(() => resolve(response)));
+    return response;
   };
-  for (const name of ['recipes', 'glossary', 'adjustments', 'brew-cues', 'offline', 'active-brew', 'app']) win.eval(read(`public/${name}.js`));
+  for (const name of ['recipes', 'glossary', 'adjustments', 'brew-cues', 'offline', ...(!omitActiveBrew ? ['active-brew'] : []), 'app']) win.eval(read(`public/${name}.js`));
   await new Promise(setImmediate);
   const el = (id) => win.document.getElementById(id);
   return {
     win, device, el,
     advance(seconds) { now += seconds * 1000; },
+    async releaseNetwork() {
+      delay = false;
+      pending.splice(0).forEach((resolve) => resolve());
+      await new Promise(setImmediate);
+    },
     click(id) { el(id).click(); },
     close() { win.close(); },
   };
@@ -146,6 +157,65 @@ function start(h, dose = 23) {
   h.click('start-brew-button');
   h.click('timer-toggle');
 }
+
+test('old cached markup and a missing persistence script retain recipes, tabs and a same-document timer', async () => {
+  const h = await app({ legacyMarkup: true, omitActiveBrew: true, pendingNetwork: true });
+  assert.equal(h.win.document.querySelectorAll('#recipe-list [data-recipe-id]').length, 24);
+  h.win.document.querySelector('[data-tab="glossary"]').click();
+  assert.equal(h.el('glossary-screen').hidden, false);
+  h.click('home-button');
+  assert.equal(h.el('library-screen').hidden, false);
+  h.win.document.querySelector('#recipe-list [data-recipe-id="v60-bright"]').click();
+  start(h); h.advance(30);
+  h.win.dispatchEvent(new h.win.Event('pageshow'));
+  assert.equal(h.el('timer-clock').textContent, '0:30');
+  h.close();
+});
+
+test('a pending private request cannot hide original recipes or hold up built-in deep links', async () => {
+  for (const route of ['/', '/?method=v60', '/?recipe=v60-bright', '/?brew=v60-bright', '/?glossary=1']) {
+    const h = await app({ route, pendingNetwork: true });
+    assert.equal(h.win.document.querySelectorAll('#recipe-list [data-recipe-id]').length, 24);
+    const expected = route.includes('method=') ? 'method' : route.includes('recipe=') ? 'recipe'
+      : route.includes('brew=') ? 'brew' : route.includes('glossary=') ? 'glossary' : 'library';
+    assert.equal(h.el(`${expected}-screen`).hidden, false, route);
+    h.close();
+  }
+});
+
+test('late private responses do not move a changed tab or reset a brew started before they arrive', async () => {
+  const browsing = await app({ delayedNetwork: true });
+  browsing.win.document.querySelector('[data-tab="glossary"]').click();
+  await browsing.releaseNetwork();
+  assert.equal(browsing.el('glossary-screen').hidden, false);
+  browsing.close();
+  const brewing = await app({ route: '/?brew=v60-bright', delayedNetwork: true });
+  brewing.click('timer-toggle'); brewing.advance(47);
+  await brewing.releaseNetwork();
+  brewing.win.dispatchEvent(new brewing.win.Event('pageshow'));
+  assert.equal(brewing.el('brew-screen').hidden, false);
+  assert.equal(brewing.el('timer-clock').textContent, '0:47');
+  assert.equal(brewing.el('timer-panel').dataset.timerState, 'running');
+  brewing.close();
+});
+
+test('private read fallback survives an offline reopening and cannot cross accounts or override a server refusal', async () => {
+  const id = 'personal-00000000-0000-4000-8000-000000000013';
+  const recipe = { ...recipes.RECIPES[0], id, revisionId: `${id}@1`, isPersonal: true, title: 'My cached recipe' };
+  const first = await app({ route: '/?myRecipes=1', personalRecipes: [recipe] });
+  const device = first.device; first.close();
+  const offline = await app({ device, route: '/?myRecipes=1', user: null, networkFailure: true });
+  assert.match(offline.el('personal-recipes-list').textContent, /My cached recipe/);
+  offline.close();
+  const other = await app({ device, route: '/?myRecipes=1', user: 7, networkFailure: true });
+  assert.doesNotMatch(other.el('personal-recipes-list').textContent, /My cached recipe/);
+  assert.equal(other.el('personal-recipes-error').hidden, false);
+  other.close();
+  const refused = await app({ device, route: '/?myRecipes=1', httpStatus: 403 });
+  assert.doesNotMatch(refused.el('personal-recipes-list').textContent, /My cached recipe/);
+  assert.equal(refused.el('personal-recipes-error').hidden, false);
+  refused.close();
+});
 
 test('real app restores a running brew at its root before any network response', async () => {
   const first = await app({ route: '/?recipe=v60-bright' });
