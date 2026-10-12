@@ -1853,10 +1853,18 @@ textarea:focus-visible,
     margin-top: 0.8rem;
   }
 
-  .brew-focus #reset-timer {
+  /* Every timer-panel child needs a slot here: an unplaced one auto-flows
+     into the narrow ring column (#45). */
+  .brew-focus .brew-secondary-actions {
     grid-column: 1 / -1;
     grid-row: 5;
     margin-top: 0.15rem;
+  }
+
+  .brew-focus #cue-settings {
+    grid-column: 1 / -1;
+    grid-row: 6;
+    margin-top: 0.75rem;
   }
 
   .brew-focus #next-step-preview {

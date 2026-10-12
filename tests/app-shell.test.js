@@ -203,6 +203,9 @@ test('guided brewing shares one timeline and enters a protected mobile focus mod
   assert.doesNotMatch(styles, /\.brew-focus #app-header/);
   assert.match(styles, /100dvh/);
   assert.match(styles, /safe-area-inset-bottom/);
+  // The focus grid places Brew cues and its panel full width (#45).
+  assert.match(styles, /\.brew-focus \.brew-secondary-actions \{\s*grid-column: 1 \/ -1;/);
+  assert.match(styles, /\.brew-focus #cue-settings \{\s*grid-column: 1 \/ -1;/);
 });
 
 test('the private journal exposes history, detail, and edit surfaces from completed brews', () => {
