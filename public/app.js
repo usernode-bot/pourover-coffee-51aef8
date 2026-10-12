@@ -2991,6 +2991,8 @@
     syncCueSettingsControls();
     elements.cueSettingsPanel.hidden = false;
     elements.cueSettingsToggle.setAttribute('aria-expanded', 'true');
+    // In the mobile focus layout the panel opens below the timer controls.
+    elements.cueSettingsPanel.scrollIntoView?.({ block: 'nearest' });
   }
 
   function closeCueSettings() {
