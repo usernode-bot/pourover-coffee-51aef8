@@ -166,6 +166,7 @@
     cueVoiceNote: document.getElementById('cue-voice-note'),
     cueHapticsNote: document.getElementById('cue-haptics-note'),
     brewComplete: document.getElementById('brew-complete'),
+    brewOverrunNotice: document.getElementById('brew-overrun-notice'),
     saveBrewNotes: document.getElementById('save-brew-notes'),
     brewAgain: document.getElementById('brew-again'),
     returnToRecipe: document.getElementById('return-to-recipe'),
@@ -352,6 +353,19 @@
   const activeBrewStore = window.PouroverActiveBrew
     ? window.PouroverActiveBrew.createStore(APP_OWNER)
     : { read: () => null, save: () => false, clear: () => {} };
+  // Same fallback pattern as the store: older cached documents without the
+  // persistence module still need a completion time and the away wording.
+  const completionTime = window.PouroverActiveBrew?.completionTime
+    ?? ((timer, totalDuration) => (timer.running
+      ? timer.anchorTime + (totalDuration - timer.anchorElapsed) * 1000
+      : null));
+  const describeOverrun = window.PouroverActiveBrew?.describeOverrun
+    ?? ((ms) => {
+      if (!Number.isFinite(ms) || ms < 60_000) return 'Brew finished while you were away.';
+      if (ms >= 3_600_000) return 'Brew ran over by more than an hour while you were away.';
+      const minutes = Math.floor(ms / 60_000);
+      return `Brew ran over by ${minutes} minute${minutes === 1 ? '' : 's'} while you were away.`;
+    });
 
   const state = {
     screen: 'library',
@@ -365,6 +379,9 @@
     lastActiveStepLabel: null,
     lastNextStepLabel: null,
     lastRenderedStep: null,
+    // Wall-clock moment the page was last hidden during a running brew; the
+    // return path uses it to detect a brew that ended while away.
+    awaySince: null,
     timer: freshTimer(),
     timerHandle: null,
     lastAnnouncedStep: -1,
@@ -594,6 +611,7 @@
       running: false,
       started: false,
       completed: false,
+      completedAt: null,
     };
   }
 
@@ -1012,6 +1030,7 @@
     cancelTimerTick();
     clearActiveBrew();
     state.timer = freshTimer();
+    state.awaySince = null;
     syncBrewFocus();
   }
 
@@ -2733,11 +2752,41 @@
     showScreen('brew', { focus: false, transition: 'none' });
     initCueRunner();
     renderBrewShell();
+    // The record is only kept for unfinished brews, so a restored completion
+    // always ended while the page was gone.
+    if (saved.timer.completedAt) showOverrunNotice(saved.timer.completedAt);
     return true;
   }
 
   function resumeBrewRendering() {
     if (state.screen === 'brew' && state.timer.started) renderTimer();
+    // The page is back: a brew that ended while away gets its notice and a
+    // second complete cue. Multiple return events (pageshow plus
+    // visibilitychange) must only announce it once.
+    if (state.awaySince !== null) {
+      if (state.timer.completed && state.timer.completedAt !== null
+        && state.timer.completedAt >= state.awaySince) {
+        showOverrunNotice(state.timer.completedAt);
+      }
+      state.awaySince = null;
+    }
+  }
+
+  // Remember when a running brew was left so the return can tell a completed
+  // brew that finished while away from one completed in view.
+  function markAway() {
+    if (state.screen === 'brew' && state.timer.running && state.awaySince === null) {
+      state.awaySince = Date.now();
+    }
+  }
+
+  function showOverrunNotice(completedAt) {
+    elements.brewOverrunNotice.textContent = describeOverrun(Math.max(0, Date.now() - completedAt));
+    elements.brewOverrunNotice.hidden = false;
+    initCueRunner();
+    // The runner dedupes on stepIndex, so a distinct key lets the complete
+    // cue play again on return.
+    state.cueRunner?.fire('complete', { stepKey: `return-${completedAt}` });
   }
 
   // The brew clock is anchored to wall-clock time, so it stays accurate in a
@@ -2745,10 +2794,13 @@
   // the delayed render to catch up immediately.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') resumeBrewRendering();
+    else markAway();
   });
+  window.addEventListener('pagehide', markAway);
   window.addEventListener('pageshow', resumeBrewRendering);
   window.addEventListener('usernode:visibility-changed', (event) => {
-    if (!event.detail?.hidden) resumeBrewRendering();
+    if (event.detail?.hidden) markAway();
+    else resumeBrewRendering();
   });
 
   function renderBrewShell() {
@@ -2764,6 +2816,8 @@
     elements.brewDose.textContent = `${state.scaled.coffee}g coffee · ${state.scaled.water}g water`;
     elements.brewRatio.textContent = `1:${formatRatio(state.scaled.ratio)} · ${state.scaled.temperature}`;
     elements.timerTotal.textContent = `of ${formatDuration(state.scaled.totalDuration)}`;
+    elements.brewOverrunNotice.hidden = true;
+    elements.brewOverrunNotice.textContent = '';
     elements.stepProgress.innerHTML = getRecipeTimeline(state.scaled).steps.map((recipeStep, index) => (
       `<span class="progress-dot" data-step-dot="${index}" data-state="upcoming" title="${recipeStep.label}"></span>`
     )).join('');
@@ -2813,6 +2867,9 @@
     cancelTimerTick();
     const elapsed = Math.max(0, Math.min(state.scaled.totalDuration, elapsedNow()));
     if (elapsed >= state.scaled.totalDuration && !state.timer.completed) {
+      // Derive the wall-clock end before running is cleared, so a return
+      // from a hidden tab can say how long ago the brew actually ended.
+      state.timer.completedAt = completionTime(state.timer, state.scaled.totalDuration) ?? Date.now();
       state.timer.elapsed = state.scaled.totalDuration;
       state.timer.running = false;
       state.timer.completed = true;
