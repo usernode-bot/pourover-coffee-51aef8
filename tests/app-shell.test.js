@@ -186,6 +186,27 @@ test('the guided timer includes an accessible non-ticking upcoming-step preview'
   assert.match(html, /id="cue-settings-toggle"/);
 });
 
+test('brew cues panel spans the timer panel on phones', () => {
+  const styles = read('public/app.css');
+  const html = read('public/index.html');
+
+  // Inside the phone brew-focus grid every timer-panel child needs an
+  // explicit placement; #cue-settings and the Brew cues / Reset timer
+  // wrapper are the last two rows (#45).
+  assert.match(styles, /\.brew-focus #step-progress \+ div \+ div \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 5;/);
+  assert.match(styles, /\.brew-focus #cue-settings \{[^}]*grid-column: 1 \/ -1;[^}]*grid-row: 6;/);
+  assert.match(styles, /grid-template-rows: auto auto auto auto auto auto/);
+  // #cue-settings stays a direct child of #timer-panel, with the button
+  // wrapper and #step-progress keeping their sibling order around it.
+  const panel = html.slice(html.indexOf('id="timer-panel"'), html.indexOf('id="brew-complete"'));
+  const cueIndex = panel.indexOf('id="cue-settings"');
+  assert.ok(cueIndex >= 0, '#cue-settings is a child of #timer-panel');
+  const progressIndex = panel.indexOf('id="step-progress"');
+  const resetWrapperIndex = panel.indexOf('id="reset-timer"');
+  assert.ok(progressIndex > cueIndex, '#step-progress follows #cue-settings inside the panel');
+  assert.ok(resetWrapperIndex > progressIndex, 'the reset wrapper follows the transport row');
+});
+
 test('guided brewing shares one timeline and enters a protected mobile focus mode', () => {
   const source = read('public/app.js');
   const recipes = read('public/recipes.js');
