@@ -97,6 +97,13 @@ test('complete cue announces brew completion', () => {
   assert.deepEqual(calls.spoken, ['<cancel>', 'Brew complete']);
 });
 
+test('a return-time complete cue with its own stepKey is not deduped', () => {
+  const { runner, calls } = makeRunner({ voice: { enabled: true }, haptics: { enabled: false } });
+  runner.fire('complete', { stepIndex: 'complete' });
+  runner.fire('complete', { stepKey: 'return-1800000000000' });
+  assert.deepEqual(calls.spoken, ['<cancel>', 'Brew complete', '<cancel>', 'Brew complete']);
+});
+
 test('disabled cues are silent no-ops and never block the timer', () => {
   const { runner, calls } = makeRunner({ haptics: { enabled: false } });
   runner.fire('transition', { action: 'Pour', stepIndex: 2 });

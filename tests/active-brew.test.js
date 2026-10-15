@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { JSDOM } = require('jsdom');
 const recipes = require('../public/recipes.js');
-const { createStore, ownerFromToken, elapsedSeconds, STORAGE_PREFIX, MAX_AGE_MS } = require('../public/active-brew.js');
+const { createStore, ownerFromToken, elapsedSeconds, completionTime, describeOverrun, STORAGE_PREFIX, MAX_AGE_MS } = require('../public/active-brew.js');
 
 const root = path.resolve(__dirname, '..');
 const read = (name) => fs.readFileSync(path.join(root, name), 'utf8');
@@ -66,6 +66,39 @@ test('brews that finish during suspension restore completion once and clear the 
   assert.equal(saved.timer.running, false);
   assert.equal(saved.timer.elapsed, recipes.scaleRecipe(recipes.RECIPES[0], 15).totalDuration);
   assert.equal(store.read(), null);
+});
+
+test('completionTime anchors a running brew to wall time and skips paused timers', () => {
+  assert.equal(completionTime(runningTimer(), 180), START + 180_000);
+  assert.equal(
+    completionTime(runningTimer({ anchorElapsed: 60, anchorTime: START + 30_000 }), 180),
+    START + 150_000,
+  );
+  assert.equal(completionTime(runningTimer({ running: false, elapsed: 47 }), 180), null);
+});
+
+test('describeOverrun words the away notice by how long the brew has been done', () => {
+  assert.equal(describeOverrun(20_000), 'Brew finished while you were away.');
+  assert.equal(describeOverrun(60_000), 'Brew ran over by 1 minute while you were away.');
+  assert.equal(describeOverrun(600_000), 'Brew ran over by 10 minutes while you were away.');
+  assert.equal(describeOverrun(3_700_000), 'Brew ran over by more than an hour while you were away.');
+});
+
+test('a record that finished while away reports when it ended; paused and in-progress records do not', () => {
+  const finishedDevice = storage();
+  createStore('6', { storage: finishedDevice, now: () => START }).save(recipes.RECIPES[0], 15, runningTimer());
+  const finished = createStore('6', { storage: finishedDevice, now: () => START + 600_000 }).read();
+  assert.equal(finished.timer.completedAt, START + 180_000);
+
+  const pausedDevice = storage();
+  createStore('6', { storage: pausedDevice, now: () => START }).save(recipes.RECIPES[0], 15, runningTimer({ running: false, elapsed: 47 }));
+  const paused = createStore('6', { storage: pausedDevice, now: () => START + 600_000 }).read();
+  assert.equal(paused.timer.completedAt, null);
+
+  const liveDevice = storage();
+  createStore('6', { storage: liveDevice, now: () => START }).save(recipes.RECIPES[0], 15, runningTimer());
+  const live = createStore('6', { storage: liveDevice, now: () => START + 90_000 }).read();
+  assert.equal(live.timer.completedAt, null);
 });
 
 test('reset, completion, invalid data and expired records cannot resurrect a brew', () => {
@@ -275,6 +308,67 @@ test('real app catches up on page restoration and Homeroom visibility, then comp
   assert.equal(h.el('brew-complete').hidden, false);
   assert.equal(h.device.getItem(`${STORAGE_PREFIX}6`), null);
   h.close();
+});
+
+function changeVisibility(h, visibilityState) {
+  Object.defineProperty(h.win.document, 'visibilityState', { value: visibilityState, configurable: true });
+  h.win.document.dispatchEvent(new h.win.Event('visibilitychange'));
+}
+
+test('a brew that ends while the tab is hidden greets the return with the ran-over notice', async () => {
+  const h = await app({ route: '/?recipe=v60-bright' });
+  start(h);
+  changeVisibility(h, 'hidden');
+  h.advance(780); // 180 s total plus 600 s of overrun
+  changeVisibility(h, 'visible');
+  assert.equal(h.el('brew-complete').hidden, false);
+  assert.equal(h.el('brew-overrun-notice').hidden, false);
+  assert.equal(h.el('brew-overrun-notice').textContent, 'Brew ran over by 10 minutes while you were away.');
+  h.click('brew-again');
+  assert.equal(h.el('brew-overrun-notice').hidden, true);
+  assert.equal(h.el('brew-overrun-notice').textContent, '');
+  h.close();
+});
+
+test('returning before the brew ends, or leaving it paused, never shows the away notice', async () => {
+  const h = await app({ route: '/?recipe=v60-bright' });
+  start(h); h.advance(30);
+  changeVisibility(h, 'hidden');
+  h.advance(30);
+  changeVisibility(h, 'visible');
+  assert.equal(h.el('brew-complete').hidden, true);
+  assert.equal(h.el('brew-overrun-notice').hidden, true);
+  h.click('timer-toggle'); // pause
+  changeVisibility(h, 'hidden');
+  h.advance(6600);
+  changeVisibility(h, 'visible');
+  assert.equal(h.el('brew-complete').hidden, true);
+  assert.equal(h.el('brew-overrun-notice').hidden, true);
+  assert.equal(h.el('timer-clock').textContent, '1:00');
+  h.close();
+});
+
+test('a completed-in-view brew that is left and revisited shows no notice', async () => {
+  const h = await app({ route: '/?recipe=v60-bright' });
+  start(h); h.advance(200);
+  h.win.document.dispatchEvent(new h.win.Event('visibilitychange')); // completes while visible
+  assert.equal(h.el('brew-complete').hidden, false);
+  assert.equal(h.el('brew-overrun-notice').hidden, true);
+  changeVisibility(h, 'hidden');
+  h.advance(600);
+  changeVisibility(h, 'visible');
+  assert.equal(h.el('brew-complete').hidden, false);
+  assert.equal(h.el('brew-overrun-notice').hidden, true);
+  h.close();
+});
+
+test('a reopened page reports how long the brew ran over while the app was closed', async () => {
+  const first = await app({ route: '/?recipe=v60-bright' });
+  start(first); const device = first.device; first.close();
+  const reopened = await app({ device, at: START + 300_000, pendingNetwork: true });
+  assert.equal(reopened.el('brew-complete').hidden, false);
+  assert.equal(reopened.el('brew-overrun-notice').textContent, 'Brew ran over by 2 minutes while you were away.');
+  reopened.close();
 });
 
 test('real app restores a private snapshot offline and isolates other users and check routes', async () => {

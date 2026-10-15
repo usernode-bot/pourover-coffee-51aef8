@@ -27,6 +27,22 @@
       : timer.elapsed;
   }
 
+  // Wall-clock moment a running brew reaches totalDuration, so a return from
+  // a hidden tab can say how long ago the brew ended. A paused timer never
+  // completes on its own, so it has no completion time.
+  function completionTime(timer, totalDuration) {
+    return timer.running
+      ? timer.anchorTime + (totalDuration - timer.anchorElapsed) * 1000
+      : null;
+  }
+
+  function describeOverrun(ms) {
+    if (!Number.isFinite(ms) || ms < 60_000) return 'Brew finished while you were away.';
+    if (ms >= 3_600_000) return 'Brew ran over by more than an hour while you were away.';
+    const minutes = Math.floor(ms / 60_000);
+    return `Brew ran over by ${minutes} minute${minutes === 1 ? '' : 's'} while you were away.`;
+  }
+
   function validSnapshot(snapshot) {
     if (!snapshot || snapshot.schemaVersion !== 1
         || !Number.isSafeInteger(snapshot.version) || snapshot.version < 1
@@ -115,12 +131,24 @@
         return {
           recipe,
           coffee: record.recipe.coffee,
-          timer: { elapsed, anchorElapsed: elapsed, anchorTime: at, running: record.running && !completed, started: true, completed },
+          timer: {
+            elapsed,
+            anchorElapsed: elapsed,
+            anchorTime: at,
+            running: record.running && !completed,
+            started: true,
+            completed,
+            // Derived, never stored: a record past its total ended at this
+            // wall-clock moment, so a restored page can report the absence.
+            completedAt: completed && record.running
+              ? record.anchorTimestamp + (record.recipe.totalDuration - record.elapsedAtAnchor) * 1000
+              : null,
+          },
         };
       } catch { clear(); return null; }
     }
     return { save, read, clear };
   }
 
-  return { STORAGE_PREFIX, MAX_AGE_MS, ownerFromToken, elapsedSeconds, createStore };
+  return { STORAGE_PREFIX, MAX_AGE_MS, ownerFromToken, elapsedSeconds, completionTime, describeOverrun, createStore };
 });
