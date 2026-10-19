@@ -2884,7 +2884,7 @@
     const { stepIndex } = timing;
     const recipeStep = timing.currentStep;
     const target = targetPresentation(recipeStep);
-    elements.timerRing.style.setProperty('--progress', `${Math.min(1, elapsed / state.scaled.totalDuration) * 360}deg`);
+    elements.timerRing.style.setProperty('--progress', `${timing.stepProgress * 360}deg`);
     elements.timerClock.textContent = formatDuration(Math.floor(elapsed));
     elements.timerStepKicker.textContent = state.timer.running ? 'Brewing' : state.timer.started ? 'Paused' : 'Ready';
     elements.timerPanel.dataset.timerState = state.timer.running ? 'running' : state.timer.started ? 'paused' : 'ready';
