@@ -202,6 +202,27 @@ test('the final ten seconds and recipe lead-time overrides remain deterministic'
   assert.equal(inWindow.isPreparing, true);
 });
 
+test('brew timing reports progress within the current step', () => {
+  const scaled = scaleRecipe('v60-bright', 15);
+  // Bloom 0 to 45, First pour 45 to 80, Final pour 80 to 115, Draw down 115 to 180.
+  assert.equal(getBrewTiming(scaled, 0).stepProgress, 0);
+  assert.equal(getBrewTiming(scaled, 22.5).stepProgress, 0.5);
+  assert.equal(getBrewTiming(scaled, 45).stepProgress, 0, 'a step boundary starts the next step empty');
+  assert.equal(getBrewTiming(scaled, 62.5).stepProgress, 0.5);
+  assert.equal(getBrewTiming(scaled, 180).stepProgress, 1);
+
+  const zeroLastStep = {
+    steps: [
+      { label: 'Pour', duration: 30, target: 100, preparation: 'Lift the kettle.' },
+      { label: 'Serve', duration: 0, target: 0, preparation: 'Reach for the mug.' },
+    ],
+  };
+  const done = getBrewTiming(zeroLastStep, 30);
+  assert.equal(done.currentStep.label, 'Serve');
+  assert.equal(done.stepProgress, 1);
+  assert.equal(Number.isFinite(done.stepProgress), true);
+});
+
 test('the last brew step has no stale upcoming action', () => {
   const timing = getBrewTiming(scaleRecipe('v60-bright', 15), 115);
   assert.equal(timing.stepIndex, 3);

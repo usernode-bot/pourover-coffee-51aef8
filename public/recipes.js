@@ -764,8 +764,14 @@
     const nextStartsAt = nextStep?.startsAt ?? null;
     const secondsUntilNext = nextStartsAt === null ? null : Math.max(0, nextStartsAt - elapsed);
     const preparationLeadSeconds = nextStep === null ? null : getPreparationLead(nextStep);
+    // Fraction of the current step that has elapsed, 0 at its start and 1 at
+    // its end, for a ring that fills within the step. Zero-duration steps
+    // never divide: they are either already over (1) or not reached (0).
+    const stepProgress = currentStep.duration > 0
+      ? Math.max(0, Math.min(1, (elapsed - currentStep.startsAt) / currentStep.duration))
+      : (elapsed >= currentStep.endsAt ? 1 : 0);
     return {
-      elapsed, totalDuration, stepIndex, stepStartsAt, currentStep,
+      elapsed, totalDuration, stepIndex, stepStartsAt, currentStep, stepProgress,
       nextStepIndex, nextStartsAt, nextStep, secondsUntilNext, preparationLeadSeconds,
       isPreparing: secondsUntilNext !== null && secondsUntilNext <= preparationLeadSeconds,
       isImminent: secondsUntilNext !== null && secondsUntilNext <= IMMINENT_PREPARATION_SECONDS,
