@@ -169,7 +169,7 @@ async function app({ device = storage(), at = START, route = '/', user = 6, pend
     if (delay) return new Promise((resolve) => pending.push(() => resolve(response)));
     return response;
   };
-  for (const name of ['recipes', 'glossary', 'adjustments', 'brew-cues', 'offline', ...(!omitActiveBrew ? ['active-brew'] : []), 'app']) win.eval(read(`public/${name}.js`));
+  for (const name of ['recipes', 'glossary', 'coffees', 'adjustments', 'brew-cues', 'offline', ...(!omitActiveBrew ? ['active-brew'] : []), 'app']) win.eval(read(`public/${name}.js`));
   await new Promise(setImmediate);
   const el = (id) => win.document.getElementById(id);
   return {

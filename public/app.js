@@ -36,6 +36,10 @@
   } = window.PouroverGlossary;
 
   const {
+    coffeesByRegion,
+  } = window.PouroverCoffees;
+
+  const {
     CUE_STORAGE_KEY,
     CUE_EVENTS,
     DEFAULT_SETTINGS: DEFAULT_CUE_SETTINGS,
@@ -67,6 +71,7 @@
     shelf: document.getElementById('shelf-screen'),
     collection: document.getElementById('collection-screen'),
     glossary: document.getElementById('glossary-screen'),
+    coffees: document.getElementById('coffees-screen'),
   };
 
   const elements = {
@@ -322,6 +327,10 @@
     glossaryResultCount: document.getElementById('glossary-result-count'),
     glossaryEmptyState: document.getElementById('glossary-empty-state'),
     glossaryClearSearch: document.getElementById('glossary-clear-search'),
+    coffeesButton: document.getElementById('coffees-button'),
+    coffeesEntry: document.getElementById('coffees-entry'),
+    coffeesList: document.getElementById('coffees-list'),
+    coffeesResultCount: document.getElementById('coffees-result-count'),
     termPanel: document.getElementById('term-panel'),
     termPanelBackdrop: document.getElementById('term-panel-backdrop'),
     termPanelCategory: document.getElementById('term-panel-category'),
@@ -650,7 +659,7 @@
           <span class="mt-1 block text-sm text-[#705d4f]">${method.character}</span>
         </span>
         <span class="relative z-10 mt-5 flex items-center justify-between gap-3">
-          <span class="text-xs font-semibold text-[#776253]">${recipeCount} recipes</span>
+          <span class="text-xs font-semibold text-[#5f4c3f]">${recipeCount} recipes</span>
           <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
         </span>
       </button>`;
@@ -1014,6 +1023,34 @@
     navigate('glossary', null, { transition: 'push' });
   }
 
+  function renderCoffees() {
+    const groups = coffeesByRegion();
+    const total = groups.reduce((sum, group) => sum + group.coffees.length, 0);
+    elements.coffeesList.innerHTML = groups.map((group) => `
+      <div class="glossary-group">
+        <h3 class="glossary-group-heading">${escapeHtml(group.region)}</h3>
+        <div class="glossary-group-cards">${group.coffees.map(coffeeCard).join('')}</div>
+      </div>`).join('');
+    elements.coffeesResultCount.textContent = `${total} ${total === 1 ? 'coffee' : 'coffees'}`;
+  }
+
+  function coffeeCard(coffee) {
+    const recipe = coffee.recipeId ? getRecipe(coffee.recipeId) : null;
+    return `
+      <article class="glossary-card coffee-card">
+        <span class="glossary-card-category">${escapeHtml(coffee.origin)}</span>
+        <span class="glossary-card-term">${escapeHtml(coffee.name)}</span>
+        <p class="glossary-card-summary">${escapeHtml(coffee.prized)}</p>
+        <p class="coffee-card-tip"><strong>Brew tip</strong> ${escapeHtml(coffee.brewTip)}</p>
+        ${recipe ? `<button class="outline-button coffee-card-recipe" type="button" data-coffee-recipe="${escapeHtml(recipe.id)}">Try ${escapeHtml(recipe.title)} <span aria-hidden="true">→</span></button>` : ''}
+      </article>`;
+  }
+
+  function openCoffees() {
+    closeTerm({ restoreFocus: false });
+    navigate('coffees', null, { transition: 'push' });
+  }
+
   function isBrewInProgress() {
     return state.screen === 'brew' && state.timer.started && !state.timer.completed;
   }
@@ -1086,6 +1123,7 @@
     journalDetail: 'journal',
     journalForm: 'journal',
     glossary: 'glossary',
+    coffees: 'library',
   };
 
   function showScreen(screen, { focus = true, transition = 'none' } = {}) {
@@ -1121,7 +1159,7 @@
   }
 
   function clearRouteParams(url) {
-    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'adjust', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
+    ['method', 'recipe', 'brew', 'shot', 'filterMethod', 'journal', 'entry', 'edit', 'adjust', 'journalMethod', 'journalRecipe', 'journalQ', 'recipeRef', 'dose', 'from', 'glossary', 'term', 'q', 'coffees', 'shelf', 'collection', 'favorites', 'brewed', 'demo', 'collections', 'myRecipes', 'recipeEditor', 'source', 'view', ...TAG_KEYS]
       .forEach((key) => url.searchParams.delete(key));
   }
 
@@ -1192,6 +1230,7 @@
       url.searchParams.set('glossary', '1');
       if (state.glossaryQuery.trim()) url.searchParams.set('q', state.glossaryQuery.trim());
     }
+    if (screen === 'coffees') url.searchParams.set('coffees', '1');
     if (shot) url.searchParams.set('shot', shot);
     return `${url.pathname}${url.search}${url.hash}`;
   }
@@ -1203,6 +1242,7 @@
     if (screen === 'library') renderLibrary();
     if (screen === 'brew') renderBrewShell();
     if (screen === 'glossary') renderGlossary();
+    if (screen === 'coffees') renderCoffees();
     if (screen === 'myRecipes') renderMyRecipes();
     const canonicalId = screen === 'method'
       ? state.method.id
@@ -1312,6 +1352,11 @@
       renderGlossary();
       showScreen('glossary', { focus: focus && !termRecord, transition: 'none' });
       if (termRecord) openTerm(termRecord.id, null);
+      return;
+    }
+    if (params.get('coffees') === '1') {
+      renderCoffees();
+      showScreen('coffees', { focus, transition: 'none' });
       return;
     }
     if (termRecord) {
@@ -2732,7 +2777,7 @@
     if (params.has('shot') || params.get('demo') === '1' || params.get('journal') === 'demo') return false;
     // Explicit links to another screen still open that screen. A plain app
     // launch or a reload of this brew restores the interrupted cup.
-    if (['recipe', 'method', 'journal', 'myRecipes', 'recipeEditor', 'shelf', 'collection', 'glossary']
+    if (['recipe', 'method', 'journal', 'myRecipes', 'recipeEditor', 'shelf', 'collection', 'glossary', 'coffees']
       .some((key) => params.has(key))) return false;
     const saved = activeBrewStore.read();
     if (!saved) return false;
@@ -3377,6 +3422,8 @@
   document.getElementById('water-guide-button')?.addEventListener('click', openWaterGuide);
   elements.about.addEventListener('click', openAbout);
   elements.glossary.addEventListener('click', openGlossary);
+  elements.coffeesButton.addEventListener('click', openCoffees);
+  elements.coffeesEntry.addEventListener('click', openCoffees);
   elements.glossarySearch.addEventListener('input', () => {
     state.glossaryQuery = elements.glossarySearch.value;
     renderGlossary();
@@ -3393,6 +3440,11 @@
   // rendered later by the timer and the recipe detail view. Triggers drawn
   // inside the panel open in place rather than stacking a second panel.
   document.addEventListener('click', (event) => {
+    const coffeeTrigger = event.target.closest('[data-coffee-recipe]');
+    if (coffeeTrigger) {
+      navigate('recipe', coffeeTrigger.dataset.coffeeRecipe, { transition: 'push' });
+      return;
+    }
     const trigger = event.target.closest('[data-term]');
     if (!trigger) return;
     const insidePanel = elements.termPanel.contains(trigger);
@@ -3431,6 +3483,7 @@
   });
   elements.back.addEventListener('click', () => {
     if (state.screen === 'glossary') navigate('library', null, { transition: 'pop' });
+    else if (state.screen === 'coffees') navigate('library', null, { transition: 'pop' });
     else if (state.screen === 'brew') navigate('recipe', recipeRouteReference(state.recipe), { transition: 'pop' });
     else if (state.screen === 'recipe' && state.recipe.isPersonal) openMyRecipes({ historyMode: 'replaceState', transition: 'pop' });
     else if (state.screen === 'recipe') navigate('method', state.recipe.methodId, { transition: 'pop' });

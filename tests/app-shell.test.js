@@ -54,6 +54,8 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?offline=shot',
     '/?brew=v60-bright&shot=active',
     '/',
+    '/',
+    '/?coffees=1',
   ]);
   assert.equal(manifest.tests[4].visual, true);
   assert.equal(manifest.tests[4].id, 'recipe.timeline');
@@ -297,8 +299,16 @@ test('the timer keeps its step label button alive across ticks', () => {
   assert.match(source, /if \(!state\.timer\.started\) state\.lastRenderedStep = null;/);
 });
 
+test('the best coffees list is reachable from the library', () => {
+  const html = read('public/index.html');
+  assert.match(html, /id="coffees-screen"/);
+  assert.match(html, /id="coffees-entry"/);
+  assert.match(html, /id="coffees-button"/);
+  assert.match(html, /src="\/coffees\.js"/);
+});
+
 test('user-facing product files contain no em dash encoding', () => {
-  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'public/adjustments.js', 'server.js', 'journal-store.js', 'personal-recipe-store.js', 'dapp.json']) {
+  for (const file of ['public/index.html', 'public/app.js', 'public/recipes.js', 'public/glossary.js', 'public/coffees.js', 'public/adjustments.js', 'server.js', 'journal-store.js', 'personal-recipe-store.js', 'dapp.json']) {
     const source = read(file);
     assert.doesNotMatch(source, /—|&mdash;|&#8212;|\\u2014/, file);
   }

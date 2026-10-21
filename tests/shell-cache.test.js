@@ -94,7 +94,7 @@ test('build fingerprints every local script/style and changes the worker for eve
   assert.match(html, /src="\/usernode-bridge\/v1\/bridge.js"/);
   assert.match(html, /src="\/usernode-native\/v1\/native.js"/);
   assert.match(html, /href="\/usernode-native\/v1\/native.css"/);
-  assert.doesNotMatch(html, /(?:src|href)="\/(?:app|recipes|active-brew|offline|brew-cues|glossary|adjustments|tailwind)\.(?:js|css)"/);
+  assert.doesNotMatch(html, /(?:src|href)="\/(?:app|recipes|active-brew|offline|brew-cues|glossary|coffees|adjustments|tailwind)\.(?:js|css)"/);
   for (const file of ['/app.js', '/active-brew.js', '/offline.js', '/brew-cues.js', '/tailwind.css']) {
     assert.ok(first.assets[first.aliases[file]], file);
   }
