@@ -659,7 +659,7 @@
           <span class="mt-1 block text-sm text-[#705d4f]">${method.character}</span>
         </span>
         <span class="relative z-10 mt-5 flex items-center justify-between gap-3">
-          <span class="text-xs font-semibold text-[#776253]">${recipeCount} recipes</span>
+          <span class="text-xs font-semibold text-[#5f4c3f]">${recipeCount} recipes</span>
           <span class="card-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></span>
         </span>
       </button>`;

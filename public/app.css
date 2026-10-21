@@ -1239,14 +1239,26 @@ textarea:focus-visible,
 }
 
 .term-mark {
+  position: relative;
   display: inline-grid;
-  width: 1.05rem;
-  height: 1.05rem;
+  width: 2.75rem;
+  height: 2.75rem;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--recipe-accent, #a84f32), white 52%);
+  border: 0;
   border-radius: 999px;
   background: transparent;
   color: color-mix(in srgb, var(--recipe-accent, #a84f32), #2d2119 25%);
+}
+
+/* The visible circle stays small; the button's box grows to a comfortable
+   touch target around it. */
+.term-mark::before {
+  content: "";
+  position: absolute;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--recipe-accent, #a84f32), white 52%);
+  border-radius: 999px;
 }
 
 .term-mark:focus-visible {
@@ -2062,7 +2074,7 @@ textarea:focus-visible,
 
 .shelf-toggle {
   display: inline-flex;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   align-items: center;
   border: 1px solid rgba(90, 64, 45, 0.18);
   border-radius: 999px;
@@ -2448,11 +2460,15 @@ textarea:focus-visible,
 }
 
 @media (max-width: 639px) {
-  #app-header .text-button {
-    padding-right: 0.28rem;
-    padding-left: 0.28rem;
-    font-size: 0.62rem;
-    letter-spacing: 0.07em;
+  /* Navigation lives in the bottom tab bar on phones, so the header keeps
+     only the brand and does not crowd or clip its labels. */
+  #app-header .text-button,
+  #app-header .brand-small {
+    display: none;
+  }
+
+  #app-header .brand-name {
+    white-space: nowrap;
   }
 
   .personal-recipe-step-actions {

@@ -93,8 +93,8 @@
             <svg viewBox="0 0 42 42"><path d="M11 14h20l-4 13a6 6 0 0 1-6 4h0a6 6 0 0 1-6-4l-4-13Z"/><path d="M9 11h24M17 7h8M28 18h2.5a4.5 4.5 0 0 1 0 9H27"/></svg>
           </span>
           <span>
-            <span class="block text-[10px] font-semibold uppercase tracking-[0.24em] text-[#947c69]">Daily ritual</span>
-            <span class="block text-sm font-semibold tracking-tight text-[#2c211a]">Pourover Coffee</span>
+            <span class="brand-small block text-[10px] font-semibold uppercase tracking-[0.24em] text-[#947c69]">Daily ritual</span>
+            <span class="brand-name block text-sm font-semibold tracking-tight text-[#2c211a]">Pourover Coffee</span>
           </span>
         </button>
         <div class="flex items-center gap-1 sm:gap-3">
@@ -1078,6 +1078,16 @@
   </noscript>
   <script>
     if ('serviceWorker' in navigator) {
+      // A device that already ran an older release keeps being served its
+      // cached shell until it reloads. When the new worker takes over, load
+      // the current shell once so new screens and entries actually appear.
+      const hadController = Boolean(navigator.serviceWorker.controller);
+      let shellRefreshed = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!hadController || shellRefreshed) return;
+        shellRefreshed = true;
+        window.location.reload();
+      });
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js').catch(() => {});
       });
