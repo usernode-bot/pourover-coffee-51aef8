@@ -333,6 +333,20 @@
         "styles/**",
         "dapp.json"
       ]
+    },
+    {
+      "id": "coffees.list",
+      "name": "Best coffees lists celebrated coffees by region",
+      "path": "/?coffees=1",
+      "expectText": "Yirgacheffe",
+      "visual": true,
+      "impact": [
+        "public/coffees.js",
+        "public/app.js",
+        "public/index.html",
+        "public/app.css",
+        "dapp.json"
+      ]
     }
   ],
   "visibility": {

@@ -1189,6 +1189,22 @@ textarea:focus-visible,
   line-height: 1.55;
 }
 
+.coffee-card-tip {
+  margin: 0;
+  color: #725f50;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
+.coffee-card-tip strong {
+  color: var(--ink, #2c211a);
+}
+
+.coffee-card-recipe {
+  align-self: flex-start;
+  min-height: 2.75rem;
+}
+
 .term-link {
   display: inline-flex;
   align-items: baseline;
