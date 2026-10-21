@@ -335,10 +335,26 @@
       ]
     },
     {
+      "id": "coffees.entry",
+      "name": "Recipe library offers the Best coffees reading list",
+      "path": "/",
+      "expectText": "Ten celebrated coffees from around the world",
+      "expectSelector": "#library-screen:not([hidden]) #coffees-entry",
+      "visual": true,
+      "impact": [
+        "public/coffees.js",
+        "public/app.js",
+        "public/index.html",
+        "public/app.css",
+        "dapp.json"
+      ]
+    },
+    {
       "id": "coffees.list",
       "name": "Best coffees lists celebrated coffees by region",
       "path": "/?coffees=1",
-      "expectText": "Yirgacheffe",
+      "expectText": "Asia and the Pacific",
+      "expectSelector": "#coffees-screen:not([hidden]) #coffees-list .coffee-card [data-coffee-recipe=\"v60-bright\"]",
       "visual": true,
       "impact": [
         "public/coffees.js",

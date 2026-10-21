@@ -54,6 +54,7 @@ test('the manifest declares navigable checks for each product screen', () => {
     '/?offline=shot',
     '/?brew=v60-bright&shot=active',
     '/',
+    '/',
     '/?coffees=1',
   ]);
   assert.equal(manifest.tests[4].visual, true);
